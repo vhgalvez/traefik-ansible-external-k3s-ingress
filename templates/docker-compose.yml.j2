@@ -14,7 +14,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.email={{ letsencrypt_email }}"
+      - "--certificatesresolvers.myresolver.acme.email=tu-email@dominio.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--experimental.fastproxy=true"
@@ -34,6 +34,8 @@ services:
     container_name: "simple-service"
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami-secure.rule=Host(`whoami.localhost`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
       - "traefik.http.routers.whoami-secure.tls.certresolver=myresolver"

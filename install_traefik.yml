@@ -4,8 +4,9 @@
   become: true
   vars:
     traefik_config_dir: /etc/traefik
+    letsencrypt_dir: /etc/traefik/letsencrypt
     docker_compose_file: /etc/traefik/docker-compose.yml
-    acme_file: /etc/traefik/acme.json
+    acme_file: /etc/traefik/letsencrypt/acme.json
     traefik_toml_file: /etc/traefik/traefik.toml
     traefik_docker_image: "traefik:v3.2"
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
@@ -57,11 +58,21 @@
         group: root
         mode: '0755'
 
+    - name: Crear directorio letsencrypt
+      ansible.builtin.file:
+        path: "{{ letsencrypt_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
         state: touch
         mode: '0600'
+        owner: root
+        group: root
 
     - name: Crear archivo de configuración traefik.toml
       ansible.builtin.template:

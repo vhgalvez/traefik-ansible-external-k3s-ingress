@@ -18,7 +18,7 @@
 [accessLog]
 
 [certificatesResolvers.myresolver.acme]
-  email = "{{ letsencrypt_email }}"
+  email = "tu-email@dominio.com"
   storage = "/letsencrypt/acme.json"
   [certificatesResolvers.myresolver.acme.httpChallenge]
     entryPoint = "web"
@@ -27,7 +27,7 @@
   [http.routers.api]
     entryPoints = ["websecure"]
     service = "api@internal"
-    rule = "Host(`{{ traefik_domain }}`)"
+    rule = "Host(`loadbalancer1.cefaslocalserver.com`)"
 
   [http.routers.whoami]
     entryPoints = ["web"]
