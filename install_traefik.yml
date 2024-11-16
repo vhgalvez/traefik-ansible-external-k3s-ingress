@@ -10,6 +10,7 @@
     traefik_docker_image: "traefik:v3.2"
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
     letsencrypt_email: "tu-email@dominio.com"
+    traefik_domain: "loadbalancer1.cefaslocalserver.com"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -45,7 +46,7 @@
       ansible.builtin.get_url:
         url: "{{ docker_compose_url }}"
         dest: /usr/local/bin/docker-compose
-        mode: '0755'
+        mode: "0755"
 
     - name: Crear directorio de configuración de Traefik
       ansible.builtin.file:
@@ -53,25 +54,25 @@
         state: directory
         owner: root
         group: root
-        mode: '0755'
+        mode: "0755"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
         state: touch
-        mode: '0600'
+        mode: "0600"
 
     - name: Crear archivo de configuración traefik.toml
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_toml_file }}"
-        mode: '0644'
+        mode: "0644"
 
     - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
         src: templates/docker-compose.yml.j2
         dest: "{{ docker_compose_file }}"
-        mode: '0644'
+        mode: "0644"
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.command:
