@@ -8,6 +8,7 @@
     acme_file: /etc/traefik/acme.json
     traefik_toml_file: /etc/traefik/traefik.toml
     traefik_docker_image: "traefik:v3.1"
+    docker_compose_url: "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -15,11 +16,9 @@
       - 6443/tcp
 
   tasks:
-    # 1. Preparar el entorno
+    # Paso 1: Preparar el Entorno
     - name: Actualizar paquetes del sistema
-      ansible.builtin.yum:
-        name: "*"
-        state: latest
+      ansible.builtin.shell: dnf update -y && dnf upgrade -y
 
     - name: Instalar dependencias necesarias
       ansible.builtin.yum:
@@ -29,21 +28,14 @@
           - vim
         state: present
 
+    # Paso 2: Instalar Docker
     - name: Configurar el repositorio de Docker
-      ansible.builtin.yum_repository:
-        name: docker-ce
-        description: Docker CE Repository
-        baseurl: https://download.docker.com/linux/centos/7/x86_64/stable
-        gpgcheck: yes
-        gpgkey: https://download.docker.com/linux/centos/gpg
+      ansible.builtin.shell: |
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 
     - name: Instalar Docker
-      ansible.builtin.yum:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-        state: present
+      ansible.builtin.shell: |
+        dnf install -y docker-ce docker-ce-cli containerd.io
 
     - name: Iniciar y habilitar Docker
       ansible.builtin.service:
@@ -51,13 +43,31 @@
         state: started
         enabled: true
 
+    # Paso 3: Instalar Docker Compose
     - name: Descargar Docker Compose
       ansible.builtin.get_url:
-        url: "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
+        url: "{{ docker_compose_url }}"
         dest: /usr/local/bin/docker-compose
         mode: '0755'
 
-    # 2. Configurar Traefik
+    - name: Verificar instalación de Docker Compose
+      ansible.builtin.command:
+        cmd: /usr/local/bin/docker-compose --version
+
+    - name: Añadir Docker Compose al PATH (permanente)
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: 'export PATH=$PATH:/usr/local/bin'
+        state: present
+
+    - name: Modificar secure_path para sudo
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        line: 'Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin'
+        state: present
+        insertafter: '^Defaults'
+
+    # Paso 4: Configurar y Ejecutar Traefik con Docker Compose
     - name: Crear directorio de configuración de Traefik
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}"
@@ -71,40 +81,32 @@
         path: "{{ acme_file }}"
         state: touch
         mode: '0600'
-        owner: root
-        group: root
 
     - name: Crear archivo de configuración traefik.toml
       ansible.builtin.template:
-        src: traefik.toml.j2
+        src: templates/traefik.toml.j2
         dest: "{{ traefik_toml_file }}"
-        owner: root
-        group: root
         mode: '0644'
 
     - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
-        src: docker-compose.yml.j2
+        src: templates/docker-compose.yml.j2
         dest: "{{ docker_compose_file }}"
-        owner: root
-        group: root
         mode: '0644'
 
-    # 3. Iniciar Traefik con Docker Compose
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.command:
         cmd: docker-compose up -d
         chdir: "{{ traefik_config_dir }}"
 
-    # 4. Configurar firewall
+    # Paso 5: Configurar el Firewall
     - name: Abrir puertos en el firewall
       ansible.builtin.firewalld:
         port: "{{ item }}"
         permanent: true
         state: enabled
       loop: "{{ firewall_ports }}"
-      notify:
-        - Reload firewall
+      notify: Reload firewall
 
   handlers:
     - name: Reload firewall
