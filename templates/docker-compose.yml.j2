@@ -25,20 +25,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./letsencrypt:/letsencrypt"
+      - "./traefik.toml:/etc/traefik/traefik.toml:ro"
     networks:
       - traefik-net
-    restart: always
-
-  whoami:
-    image: "traefik/whoami"
-    container_name: "simple-service"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.localhost`)"
-      - "traefik.http.routers.whoami-secure.entrypoints=websecure"
-      - "traefik.http.routers.whoami-secure.tls.certresolver=myresolver"
-    networks:
-      - traefik-net
-    restart: always
+    rest
