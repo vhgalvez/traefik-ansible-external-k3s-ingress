@@ -9,11 +9,11 @@
     traefik_toml_file: /etc/traefik/traefik.toml
     traefik_docker_image: "traefik:v3.2"
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
+    letsencrypt_email: "tu-email@dominio.com"
     firewall_ports:
       - 80/tcp
       - 443/tcp
       - 8080/tcp
-      - 6443/tcp
 
   tasks:
     - name: Actualizar paquetes del sistema
@@ -47,23 +47,6 @@
         dest: /usr/local/bin/docker-compose
         mode: '0755'
 
-    - name: Verificar instalación de Docker Compose
-      ansible.builtin.command:
-        cmd: /usr/local/bin/docker-compose --version
-
-    - name: Añadir Docker Compose al PATH (permanente)
-      ansible.builtin.lineinfile:
-        path: /etc/profile
-        line: 'export PATH=$PATH:/usr/local/bin'
-        state: present
-
-    - name: Modificar secure_path para sudo
-      ansible.builtin.lineinfile:
-        path: /etc/sudoers
-        line: 'Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin'
-        state: present
-        insertafter: '^Defaults'
-
     - name: Crear directorio de configuración de Traefik
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}"
@@ -95,7 +78,7 @@
         cmd: docker-compose up -d
         chdir: "{{ traefik_config_dir }}"
 
-    - name: Abrir puertos en el firewall
+    - name: Configurar Firewall
       ansible.builtin.firewalld:
         port: "{{ item }}"
         permanent: true

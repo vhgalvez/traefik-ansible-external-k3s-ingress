@@ -20,7 +20,7 @@
 [accessLog]
 
 [certificatesResolvers.myresolver.acme]
-  email = "your-email@example.com"
+  email = "{{ letsencrypt_email }}"
   storage = "/letsencrypt/acme.json"
   [certificatesResolvers.myresolver.acme.httpChallenge]
     entryPoint = "web"
