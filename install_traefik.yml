@@ -11,6 +11,7 @@
     docker_compose_url: "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "loadbalancer1.cefaslocalserver.com"
+    whoami_host: "whoami.localhost"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -87,6 +88,12 @@
         state: enabled
       loop: "{{ firewall_ports }}"
       notify: Reload firewall
+
+    - name: Agregar entrada en /etc/hosts para whoami.localhost
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_host }} {{ whoami_host }}"
+        state: present
 
   handlers:
     - name: Reload firewall

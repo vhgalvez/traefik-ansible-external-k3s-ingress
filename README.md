@@ -93,3 +93,12 @@ Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE
 ## Autor
 
 Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
+
+
+Error de resolución DNS: Si whoami.localhost no se resuelve, añade esta entrada al archivo /etc/hosts en tu máquina cliente:
+
+plaintext
+Copiar código
+10.17.3.12 whoami.localhost
+
+
