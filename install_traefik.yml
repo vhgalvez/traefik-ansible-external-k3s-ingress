@@ -5,6 +5,7 @@
   vars:
     traefik_config_dir: /etc/traefik
     letsencrypt_dir: /etc/traefik/letsencrypt
+    certs_dir: /etc/traefik/certs
     docker_compose_file: /etc/traefik/docker-compose.yml
     acme_file: /etc/traefik/letsencrypt/acme.json
     traefik_toml_file: /etc/traefik/traefik.toml
@@ -56,22 +57,6 @@
         mode: '0755'
       when: not compose_check.stat.exists
 
-    - name: Verificar PATH para Docker Compose
-      ansible.builtin.shell: echo $PATH
-      register: path_check
-      changed_when: false
-
-    - name: Añadir /usr/local/bin al PATH si no está presente
-      ansible.builtin.lineinfile:
-        path: /etc/profile.d/docker-compose.sh
-        line: 'export PATH=$PATH:/usr/local/bin'
-        create: yes
-      when: "'/usr/local/bin' not in path_check.stdout"
-
-    - name: Recargar perfil de shell
-      ansible.builtin.shell: source /etc/profile.d/docker-compose.sh
-      when: "'/usr/local/bin' not in path_check.stdout"
-
     - name: Crear directorio de configuración de Traefik
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}"
@@ -87,6 +72,23 @@
         owner: root
         group: root
         mode: '0755'
+
+    - name: Crear directorio para certificados
+      ansible.builtin.file:
+        path: "{{ certs_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Generar certificado autofirmado
+      ansible.builtin.shell: |
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout {{ certs_dir }}/whoami.localhost.key \
+        -out {{ certs_dir }}/whoami.localhost.crt \
+        -subj "/CN=whoami.localhost"
+      args:
+        creates: "{{ certs_dir }}/whoami.localhost.crt"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:

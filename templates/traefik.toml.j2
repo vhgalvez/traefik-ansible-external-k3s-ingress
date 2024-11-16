@@ -17,17 +17,11 @@
 
 [accessLog]
 
-[certificatesResolvers.myresolver.acme]
-  email = "tu-email@dominio.com"
-  storage = "/letsencrypt/acme.json"
-  [certificatesResolvers.myresolver.acme.httpChallenge]
-    entryPoint = "web"
-
 [http.routers]
   [http.routers.api]
     entryPoints = ["websecure"]
     service = "api@internal"
-    rule = "Host(`loadbalancer1.cefaslocalserver.com`)"
+    rule = "Host(`{{ traefik_domain }}`)"
 
   [http.routers.whoami]
     entryPoints = ["web"]
@@ -38,13 +32,3 @@
     entryPoints = ["websecure"]
     service = "whoami"
     rule = "Host(`whoami.localhost`)"
-    [http.routers.whoami-secure.tls]
-      certResolver = "myresolver"
-
-[http.services]
-  [http.services.whoami.loadBalancer]
-    [[http.services.whoami.loadBalancer.servers]]
-      url = "http://simple-service:80"
-
-[experimental]
-  [experimental.fastProxy]

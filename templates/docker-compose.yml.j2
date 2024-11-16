@@ -14,17 +14,16 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.email=tu-email@dominio.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--experimental.fastproxy=true"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.http.tls.certificates[0].certFile=/certs/whoami.localhost.crt"
+      - "--entrypoints.websecure.http.tls.certificates[0].keyFile=/certs/whoami.localhost.key"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./letsencrypt:/letsencrypt"
+      - "/etc/traefik/certs:/certs"
     networks:
       - traefik-net
     restart: always
@@ -38,7 +37,6 @@ services:
       - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami-secure.rule=Host(`whoami.localhost`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
-      - "traefik.http.routers.whoami-secure.tls.certresolver=myresolver"
     networks:
       - traefik-net
     restart: always
