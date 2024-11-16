@@ -63,7 +63,7 @@ kubernetes-traefik-loadbalancer-docker/
    Usa el siguiente comando para instalar y configurar Traefik:
 
    ```bash
-   ansible-playbook -i inventory/hosts.ini install_traefik.yml
+   sudo ansible-playbook -i inventory/hosts.ini install_traefik.yml
    ```
 
 4. **Verificar el Estado de Traefik**:
