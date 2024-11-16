@@ -3,8 +3,6 @@
     address = ":80"
   [entryPoints.websecure]
     address = ":443"
-  [entryPoints.k8sApi]
-    address = ":6443"
 
 [api]
   dashboard = true
@@ -29,21 +27,24 @@
   [http.routers.api]
     entryPoints = ["websecure"]
     service = "api@internal"
-    rule = "Host(`load_balancer1.cefaslocalserver.com`)"
+    rule = "Host(`{{ traefik_domain }}`)"
 
-  [http.routers.k8sApi]
-    entryPoints = ["k8sApi"]
-    service = "k8sApi"
-    rule = "Host(`api.okd-cluster.cefaslocalserver.com`)"
+  [http.routers.whoami]
+    entryPoints = ["web"]
+    service = "whoami"
+    rule = "Host(`whoami.localhost`)"
+
+  [http.routers.whoami-secure]
+    entryPoints = ["websecure"]
+    service = "whoami"
+    rule = "Host(`whoami.localhost`)"
+    [http.routers.whoami-secure.tls]
+      certResolver = "myresolver"
 
 [http.services]
-  [http.services.k8sApi.loadBalancer]
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master1.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master2.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master3.cefaslocalserver.com:6443"
+  [http.services.whoami.loadBalancer]
+    [[http.services.whoami.loadBalancer.servers]]
+      url = "http://simple-service:80"
 
 [experimental]
   [experimental.fastProxy]
