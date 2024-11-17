@@ -3,6 +3,10 @@
     address = ":80"
   [entryPoints.websecure]
     address = ":443"
+    [entryPoints.websecure.http.tls]
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/certs/whoami.localhost.crt"
+        keyFile = "/certs/whoami.localhost.key"
 
 [api]
   dashboard = true
@@ -45,7 +49,7 @@
   [http.routers.k8sApi]
     entryPoints = ["websecure"]
     service = "k8sApi"
-    rule = "Host(`api.okd-cluster.cefaslocalserver.com`)"
+    rule = "Host(`k3s-api.cefaslocalserver.com`)"
     [http.routers.k8sApi.tls]
       certResolver = "myresolver"
 

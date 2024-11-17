@@ -5,6 +5,7 @@
   vars:
     traefik_config_dir: /etc/traefik
     letsencrypt_dir: /etc/traefik/letsencrypt
+    certs_dir: /etc/traefik/certs
     docker_compose_file: /etc/traefik/docker-compose.yml
     acme_file: /etc/traefik/letsencrypt/acme.json
     traefik_toml_file: /etc/traefik/traefik.toml
@@ -13,6 +14,9 @@
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "loadbalancer1.cefaslocalserver.com"
     whoami_host: "whoami.localhost"
+    cert_common_name: "whoami.localhost"
+    cert_key_file: "{{ certs_dir }}/whoami.localhost.key"
+    cert_crt_file: "{{ certs_dir }}/whoami.localhost.crt"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -20,7 +24,9 @@
 
   tasks:
     - name: Actualizar paquetes del sistema
-      ansible.builtin.shell: dnf update -y && dnf upgrade -y
+      ansible.builtin.yum:
+        name: "*"
+        state: latest
 
     - name: Instalar dependencias necesarias
       ansible.builtin.yum:
@@ -28,15 +34,16 @@
           - epel-release
           - wget
           - vim
+          - openssl
         state: present
 
     - name: Configurar el repositorio de Docker
-      ansible.builtin.shell: |
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+      ansible.builtin.command:
+        cmd: dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 
     - name: Instalar Docker
-      ansible.builtin.shell: |
-        dnf install -y docker-ce docker-ce-cli containerd.io
+      ansible.builtin.command:
+        cmd: dnf install -y docker-ce docker-ce-cli containerd.io
 
     - name: Iniciar y habilitar Docker
       ansible.builtin.systemd:
@@ -56,41 +63,42 @@
         mode: '0755'
       when: not compose_check.stat.exists
 
-    - name: Crear directorio de configuración de Traefik
+    - name: Crear directorios necesarios
       ansible.builtin.file:
-        path: "{{ traefik_config_dir }}"
+        path: "{{ item }}"
         state: directory
         owner: root
         group: root
         mode: '0755'
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ letsencrypt_dir }}"
+        - "{{ certs_dir }}"
 
-    - name: Crear directorio letsencrypt
-      ansible.builtin.file:
-        path: "{{ letsencrypt_dir }}"
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
+    - name: Crear certificados autofirmados
+      ansible.builtin.command:
+        cmd: >
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048
+          -keyout {{ cert_key_file }} -out {{ cert_crt_file }}
+          -subj "/CN={{ cert_common_name }}"
+      args:
+        creates: "{{ cert_key_file }}"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
         state: touch
         mode: '0600'
-        owner: root
-        group: root
 
     - name: Crear archivo de configuración traefik.toml
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_toml_file }}"
-        mode: '0644'
 
     - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
         src: templates/docker-compose.yml.j2
         dest: "{{ docker_compose_file }}"
-        mode: '0644'
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.command:
