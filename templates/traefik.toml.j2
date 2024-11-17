@@ -4,7 +4,7 @@
 
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.tls]
+    [entryPoints.websecure.http.tls]
 
 [api]
   dashboard = true
@@ -18,16 +18,6 @@
     endpoint = "unix:///var/run/docker.sock"
     watch = true
     exposedByDefault = false
-
-[certificatesResolvers]
-  [certificatesResolvers.default]
-    [certificatesResolvers.default.tls]
-      [[certificatesResolvers.default.tls.certificates]]
-        certFile = "/certs/whoami.localhost.crt"
-        keyFile = "/certs/whoami.localhost.key"
-      [[certificatesResolvers.default.tls.certificates]]
-        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
-        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
 [http.routers]
   [http.routers.whoami]
@@ -45,6 +35,16 @@
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
+
+[certificatesResolvers]
+  [certificatesResolvers.default]
+    [certificatesResolvers.default.tls]
+      [[certificatesResolvers.default.tls.certificates]]
+        certFile = "/certs/whoami.localhost.crt"
+        keyFile = "/certs/whoami.localhost.key"
+      [[certificatesResolvers.default.tls.certificates]]
+        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
+        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]
