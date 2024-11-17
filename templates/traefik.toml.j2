@@ -3,13 +3,6 @@
     address = ":80"
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]
-      [[entryPoints.websecure.http.tls.certificates]]
-        certFile = "/certs/whoami.localhost.crt"
-        keyFile = "/certs/whoami.localhost.key"
-      [[entryPoints.websecure.http.tls.certificates]]
-        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
-        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
 [api]
   dashboard = true
@@ -24,6 +17,13 @@
 
 [accessLog]
 
+[certificatesResolvers]
+  [certificatesResolvers.myresolver.acme]
+    email = "tu-email@dominio.com"
+    storage = "/letsencrypt/acme.json"
+    [certificatesResolvers.myresolver.acme.httpChallenge]
+      entryPoint = "web"
+
 [http.routers]
   [http.routers.whoami]
     entryPoints = ["web"]
@@ -35,18 +35,13 @@
     service = "whoami"
     rule = "Host(`whoami.localhost`)"
     [http.routers.whoami-secure.tls]
+      certResolver = "myresolver"
 
   [http.routers.loadbalancer]
     entryPoints = ["websecure"]
     service = "api@internal"
     rule = "Host(`loadbalancer1.cefaslocalserver.com`)"
-
-  [http.routers.k8sApi]
-    entryPoints = ["websecure"]
-    service = "k8sApi"
-    rule = "Host(`k8s-api.cefaslocalserver.com`)"
-    [http.routers.k8sApi.tls]
-      certResolver = "myresolver"
+    [http.routers.loadbalancer.tls]
 
 [http.services]
   [http.services.whoami.loadBalancer]
