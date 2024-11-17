@@ -14,9 +14,10 @@
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "loadbalancer1.cefaslocalserver.com"
     whoami_host: "whoami.localhost"
-    cert_common_name: "whoami.localhost"
-    cert_key_file: "{{ certs_dir }}/whoami.localhost.key"
-    cert_crt_file: "{{ certs_dir }}/whoami.localhost.crt"
+    cert_whoami_key: "{{ certs_dir }}/whoami.localhost.key"
+    cert_whoami_crt: "{{ certs_dir }}/whoami.localhost.crt"
+    cert_loadbalancer_key: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.key"
+    cert_loadbalancer_crt: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.crt"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -38,12 +39,12 @@
         state: present
 
     - name: Configurar el repositorio de Docker
-      ansible.builtin.command:
-        cmd: dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+      ansible.builtin.shell: |
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 
     - name: Instalar Docker
-      ansible.builtin.command:
-        cmd: dnf install -y docker-ce docker-ce-cli containerd.io
+      ansible.builtin.shell: |
+        dnf install -y docker-ce docker-ce-cli containerd.io
 
     - name: Iniciar y habilitar Docker
       ansible.builtin.systemd:
@@ -75,14 +76,23 @@
         - "{{ letsencrypt_dir }}"
         - "{{ certs_dir }}"
 
-    - name: Crear certificados autofirmados
+    - name: Crear certificado autofirmado para whoami.localhost
       ansible.builtin.command:
         cmd: >
           openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ cert_key_file }} -out {{ cert_crt_file }}
-          -subj "/CN={{ cert_common_name }}"
+          -keyout {{ cert_whoami_key }} -out {{ cert_whoami_crt }}
+          -subj "/CN=whoami.localhost"
       args:
-        creates: "{{ cert_key_file }}"
+        creates: "{{ cert_whoami_key }}"
+
+    - name: Crear certificado autofirmado para loadbalancer1.cefaslocalserver.com
+      ansible.builtin.command:
+        cmd: >
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048
+          -keyout {{ cert_loadbalancer_key }} -out {{ cert_loadbalancer_crt }}
+          -subj "/CN=loadbalancer1.cefaslocalserver.com"
+      args:
+        creates: "{{ cert_loadbalancer_key }}"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
