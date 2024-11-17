@@ -14,13 +14,14 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "{{ certs_dir }}:/certs:ro"
+      - "{{ certs_dir }}:/certs"
       - "{{ traefik_toml_file }}:/traefik.toml"
     networks:
       - traefik-net

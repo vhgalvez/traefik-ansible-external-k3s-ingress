@@ -1,9 +1,16 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
+
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/certs/whoami.localhost.crt"
+        keyFile = "/certs/whoami.localhost.key"
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
+        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
 [api]
   dashboard = true
@@ -12,19 +19,10 @@
 [log]
   level = "DEBUG"
 
-[providers]
-  [providers.docker]
-    endpoint = "unix:///var/run/docker.sock"
-    watch = true
-    exposedByDefault = false
-
-[tls]
-  [[tls.certificates]]
-    certFile = "/certs/whoami.localhost.crt"
-    keyFile = "/certs/whoami.localhost.key"
-  [[tls.certificates]]
-    certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
-    keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
+[providers.docker]
+  endpoint = "unix:///var/run/docker.sock"
+  watch = true
+  exposedByDefault = false
 
 [http.routers]
   [http.routers.whoami]
