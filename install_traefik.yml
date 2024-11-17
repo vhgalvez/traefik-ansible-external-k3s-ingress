@@ -36,6 +36,7 @@
           - wget
           - vim
           - openssl
+          - net-tools
         state: present
 
     - name: Configurar el repositorio de Docker
@@ -52,17 +53,11 @@
         state: started
         enabled: true
 
-    - name: Verificar si Docker Compose está instalado
-      ansible.builtin.stat:
-        path: /usr/local/bin/docker-compose
-      register: compose_check
-
-    - name: Instalar Docker Compose si no está presente
+    - name: Instalar Docker Compose
       ansible.builtin.get_url:
         url: "{{ docker_compose_url }}"
         dest: /usr/local/bin/docker-compose
         mode: '0755'
-      when: not compose_check.stat.exists
 
     - name: Crear directorios necesarios
       ansible.builtin.file:
@@ -85,8 +80,6 @@
       with_items:
         - { key: "{{ cert_whoami_key }}", crt: "{{ cert_whoami_crt }}", cn: "whoami.localhost" }
         - { key: "{{ cert_loadbalancer_key }}", crt: "{{ cert_loadbalancer_crt }}", cn: "loadbalancer1.cefaslocalserver.com" }
-      args:
-        creates: "{{ item.key }}"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
@@ -94,7 +87,7 @@
         state: touch
         mode: '0600'
 
-    - name: Crear archivo de configuración traefik.toml
+    - name: Crear archivo traefik.toml
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_toml_file }}"
@@ -106,7 +99,7 @@
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.command:
-        cmd: /usr/local/bin/docker-compose up -d
+        cmd: docker-compose up -d
         chdir: "{{ traefik_config_dir }}"
 
     - name: Configurar Firewall
@@ -117,16 +110,10 @@
       loop: "{{ firewall_ports }}"
       notify: Reload firewall
 
-    - name: Agregar entrada en /etc/hosts para whoami.localhost
+    - name: Agregar entradas en /etc/hosts
       ansible.builtin.lineinfile:
         path: /etc/hosts
-        line: "127.0.0.1 {{ whoami_host }}"
-        state: present
-
-    - name: Agregar entrada en /etc/hosts para loadbalancer1.cefaslocalserver.com
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        line: "127.0.0.1 {{ traefik_domain }}"
+        line: "{{ ansible_host }} {{ whoami_host }} {{ traefik_domain }}"
         state: present
 
   handlers:

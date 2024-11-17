@@ -4,13 +4,6 @@
 
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]
-      [[entryPoints.websecure.http.tls.certificates]]
-        certFile = "/certs/whoami.localhost.crt"
-        keyFile = "/certs/whoami.localhost.key"
-      [[entryPoints.websecure.http.tls.certificates]]
-        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
-        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
 [api]
   dashboard = true
@@ -40,6 +33,15 @@
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
+
+[certificatesResolvers.default.tls]
+  [[certificatesResolvers.default.tls.certificates]]
+    certFile = "/certs/whoami.localhost.crt"
+    keyFile = "/certs/whoami.localhost.key"
+  [[certificatesResolvers.default.tls.certificates]]
+    certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
+    keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
+
 
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]
