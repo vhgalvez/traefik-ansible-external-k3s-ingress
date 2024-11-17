@@ -3,51 +3,42 @@
     address = ":80"
   [entryPoints.websecure]
     address = ":443"
+    [entryPoints.websecure.http.tls]
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/certs/whoami.localhost.crt"
+        keyFile = "/certs/whoami.localhost.key"
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
+        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
 
 [api]
   dashboard = true
   insecure = true
 
-[providers.docker]
-  endpoint = "unix:///var/run/docker.sock"
-  exposedByDefault = false
-
 [log]
   level = "DEBUG"
 
-[accessLog]
-
-[certificatesResolvers]
-  [certificatesResolvers.myresolver.acme]
-    email = "{{ letsencrypt_email }}"
-    storage = "/letsencrypt/acme.json"
-    [certificatesResolvers.myresolver.acme.httpChallenge]
-      entryPoint = "web"
+[providers.docker]
+  endpoint = "unix:///var/run/docker.sock"
+  watch = true
+  exposedByDefault = false
 
 [http.routers]
   [http.routers.whoami]
     entryPoints = ["web"]
-    service = "whoami"
     rule = "Host(`whoami.localhost`)"
+    service = "whoami"
 
   [http.routers.whoami-secure]
     entryPoints = ["websecure"]
-    service = "whoami"
     rule = "Host(`whoami.localhost`)"
+    service = "whoami"
     [http.routers.whoami-secure.tls]
-      certResolver = "myresolver"
-
-  [http.routers.loadbalancer]
-    entryPoints = ["websecure"]
-    service = "api@internal"
-    rule = "Host(`loadbalancer1.cefaslocalserver.com`)"
-    [http.routers.loadbalancer.tls]
 
 [http.services]
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
-
 
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]
