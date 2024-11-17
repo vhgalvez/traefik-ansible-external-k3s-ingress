@@ -53,17 +53,16 @@
         state: started
         enabled: true
 
-    - name: Verificar si Docker Compose está instalado
-      ansible.builtin.stat:
-        path: /usr/local/bin/docker-compose
-      register: compose_check
+    - name: Instalar Docker Compose
+      ansible.builtin.command:
+        cmd: curl -L "{{ docker_compose_url }}" -o /usr/local/bin/docker-compose
+      args:
+        creates: /usr/local/bin/docker-compose
 
-    - name: Instalar Docker Compose si no está presente
-      ansible.builtin.get_url:
-        url: "{{ docker_compose_url }}"
-        dest: /usr/local/bin/docker-compose
+    - name: Hacer ejecutable Docker Compose
+      ansible.builtin.file:
+        path: /usr/local/bin/docker-compose
         mode: '0755'
-      when: not compose_check.stat.exists
 
     - name: Crear directorios necesarios
       ansible.builtin.file:
@@ -105,14 +104,11 @@
 
     - name: Verificar la ejecución de docker-compose
       ansible.builtin.command:
-        cmd: docker-compose version
-        chdir: "{{ traefik_config_dir }}"
-      register: docker_compose_version
-      failed_when: docker_compose_version.rc != 0
+        cmd: /usr/local/bin/docker-compose version
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.command:
-        cmd: docker-compose up -d
+        cmd: /usr/local/bin/docker-compose up -d
         chdir: "{{ traefik_config_dir }}"
 
     - name: Configurar Firewall
