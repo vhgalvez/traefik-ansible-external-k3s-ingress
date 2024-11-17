@@ -19,7 +19,7 @@
 
 [certificatesResolvers]
   [certificatesResolvers.myresolver.acme]
-    email = "tu-email@dominio.com"
+    email = "{{ letsencrypt_email }}"
     storage = "/letsencrypt/acme.json"
     [certificatesResolvers.myresolver.acme.httpChallenge]
       entryPoint = "web"
@@ -47,6 +47,7 @@
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
+
 
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]

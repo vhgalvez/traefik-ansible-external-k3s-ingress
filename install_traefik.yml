@@ -76,23 +76,17 @@
         - "{{ letsencrypt_dir }}"
         - "{{ certs_dir }}"
 
-    - name: Crear certificado autofirmado para whoami.localhost
+    - name: Crear certificados autofirmados
       ansible.builtin.command:
         cmd: >
           openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ cert_whoami_key }} -out {{ cert_whoami_crt }}
-          -subj "/CN=whoami.localhost"
+          -keyout {{ item.key }} -out {{ item.crt }}
+          -subj "/CN={{ item.cn }}"
+      with_items:
+        - { key: "{{ cert_whoami_key }}", crt: "{{ cert_whoami_crt }}", cn: "whoami.localhost" }
+        - { key: "{{ cert_loadbalancer_key }}", crt: "{{ cert_loadbalancer_crt }}", cn: "loadbalancer1.cefaslocalserver.com" }
       args:
-        creates: "{{ cert_whoami_key }}"
-
-    - name: Crear certificado autofirmado para loadbalancer1.cefaslocalserver.com
-      ansible.builtin.command:
-        cmd: >
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ cert_loadbalancer_key }} -out {{ cert_loadbalancer_crt }}
-          -subj "/CN=loadbalancer1.cefaslocalserver.com"
-      args:
-        creates: "{{ cert_loadbalancer_key }}"
+        creates: "{{ item.key }}"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
