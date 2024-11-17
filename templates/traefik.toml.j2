@@ -34,10 +34,11 @@
     entryPoints = ["websecure"]
     service = "whoami"
     rule = "Host(`whoami.localhost`)"
+    [http.routers.whoami-secure.tls]
 
   [http.routers.loadbalancer]
     entryPoints = ["websecure"]
-    service = "traefik"
+    service = "api@internal"
     rule = "Host(`loadbalancer1.cefaslocalserver.com`)"
 
   [http.routers.k8sApi]
