@@ -30,11 +30,27 @@
     rule = "Host(`whoami.localhost`)"
     service = "whoami"
     [http.routers.whoami-secure.tls]
+      certResolver = "default"
+
+  [http.routers.k8sApi]
+    entryPoints = ["websecure"]
+    rule = "Host(`k8sapi.localhost`)"
+    service = "k8sApi"
+    [http.routers.k8sApi.tls]
+      certResolver = "default"
 
 [http.services]
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
+
+  [http.services.k8sApi.loadBalancer]
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master1.cefaslocalserver.com:6443"
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master2.cefaslocalserver.com:6443"
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master3.cefaslocalserver.com:6443"
 
 [certificatesResolvers]
   [certificatesResolvers.default]
@@ -45,11 +61,3 @@
       [[certificatesResolvers.default.tls.certificates]]
         certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
         keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
-
-  [http.services.k8sApi.loadBalancer]
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master1.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master2.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master3.cefaslocalserver.com:6443"
