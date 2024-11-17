@@ -17,6 +17,13 @@
 
 [accessLog]
 
+[certificatesResolvers]
+  [certificatesResolvers.myresolver.acme]
+    email = "{{ letsencrypt_email }}"
+    storage = "/letsencrypt/acme.json"
+    [certificatesResolvers.myresolver.acme.httpChallenge]
+      entryPoint = "web"
+
 [http.routers]
   [http.routers.api]
     entryPoints = ["websecure"]
@@ -32,3 +39,25 @@
     entryPoints = ["websecure"]
     service = "whoami"
     rule = "Host(`whoami.localhost`)"
+    [http.routers.whoami-secure.tls]
+      certResolver = "myresolver"
+
+  [http.routers.k8sApi]
+    entryPoints = ["websecure"]
+    service = "k8sApi"
+    rule = "Host(`api.okd-cluster.cefaslocalserver.com`)"
+    [http.routers.k8sApi.tls]
+      certResolver = "myresolver"
+
+[http.services]
+  [http.services.whoami.loadBalancer]
+    [[http.services.whoami.loadBalancer.servers]]
+      url = "http://simple-service:80"
+
+  [http.services.k8sApi.loadBalancer]
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master1.cefaslocalserver.com:6443"
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master2.cefaslocalserver.com:6443"
+    [[http.services.k8sApi.loadBalancer.servers]]
+      url = "https://master3.cefaslocalserver.com:6443"
