@@ -23,17 +23,12 @@
 
 [certificatesResolvers]
   [certificatesResolvers.myresolver.acme]
-    email = "{{ letsencrypt_email }}"
+    email = "tu-email@dominio.com"
     storage = "/letsencrypt/acme.json"
     [certificatesResolvers.myresolver.acme.httpChallenge]
       entryPoint = "web"
 
 [http.routers]
-  [http.routers.api]
-    entryPoints = ["websecure"]
-    service = "api@internal"
-    rule = "Host(`{{ traefik_domain }}`)"
-
   [http.routers.whoami]
     entryPoints = ["web"]
     service = "whoami"
@@ -44,13 +39,6 @@
     service = "whoami"
     rule = "Host(`whoami.localhost`)"
     [http.routers.whoami-secure.tls]
-      certResolver = "myresolver"
-
-  [http.routers.k8sApi]
-    entryPoints = ["websecure"]
-    service = "k8sApi"
-    rule = "Host(`k3s-api.cefaslocalserver.com`)"
-    [http.routers.k8sApi.tls]
       certResolver = "myresolver"
 
 [http.services]
