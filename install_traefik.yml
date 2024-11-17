@@ -88,6 +88,13 @@
       args:
         creates: "{{ item.key }}"
 
+    - name: Configurar permisos de los certificados
+      ansible.builtin.file:
+        path: "{{ certs_dir }}"
+        state: directory
+        mode: '0755'
+        recurse: yes
+
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
@@ -117,14 +124,4 @@
       loop: "{{ firewall_ports }}"
       notify: Reload firewall
 
-    - name: Agregar entrada en /etc/hosts para whoami.localhost
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        line: "{{ ansible_host }} {{ whoami_host }}"
-        state: present
-
-  handlers:
-    - name: Reload firewall
-      ansible.builtin.service:
-        name: firewalld
-        state: reloaded
+    - name: Agregar entrada en /etc/hosts para whoami.local

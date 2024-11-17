@@ -20,7 +20,7 @@ services:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "{{ certs_dir }}:/certs"
+      - "{{ certs_dir }}:/certs:ro"
       - "{{ traefik_toml_file }}:/traefik.toml"
     networks:
       - traefik-net
