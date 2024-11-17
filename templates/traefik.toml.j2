@@ -5,6 +5,7 @@
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
+      certResolver = "default"
 
 [api]
   dashboard = true
@@ -54,10 +55,8 @@
 
 [certificatesResolvers]
   [certificatesResolvers.default]
-    [certificatesResolvers.default.tls]
-      [[certificatesResolvers.default.tls.certificates]]
-        certFile = "/certs/whoami.localhost.crt"
-        keyFile = "/certs/whoami.localhost.key"
-      [[certificatesResolvers.default.tls.certificates]]
-        certFile = "/certs/loadbalancer1.cefaslocalserver.com.crt"
-        keyFile = "/certs/loadbalancer1.cefaslocalserver.com.key"
+    [certificatesResolvers.default.acme]
+      email = "tu-email@dominio.com"
+      storage = "/etc/traefik/letsencrypt/acme.json"
+      caServer = "https://acme-v02.api.letsencrypt.org/directory"
+      httpChallenge = {}
