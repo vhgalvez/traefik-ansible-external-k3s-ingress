@@ -21,7 +21,6 @@
     exposedByDefault = false
 
 [http.routers]
-  # Router para el servicio whoami
   [http.routers.whoami]
     entryPoints = ["web"]
     rule = "Host(`whoami.localhost`)"
@@ -34,7 +33,6 @@
     [http.routers.whoami-secure.tls]
       certResolver = "default"
 
-  # Router para el API de Kubernetes
   [http.routers.k8sApi]
     entryPoints = ["websecure"]
     rule = "Host(`k8sapi.localhost`)"
