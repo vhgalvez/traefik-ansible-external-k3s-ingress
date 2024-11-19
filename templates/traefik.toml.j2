@@ -45,14 +45,6 @@
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
 
-  [http.services.k8sApi.loadBalancer]
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master1.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master2.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master3.cefaslocalserver.com:6443"
-
 [certificatesResolvers]
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
