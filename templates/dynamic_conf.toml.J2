@@ -1,3 +1,11 @@
+[http.routers]
+  [http.routers.k8sApi]
+    entryPoints = ["websecure"]
+    rule = "Host(`k8sapi.cefaslocalserver.com`)"
+    service = "k8sApi"
+    [http.routers.k8sApi.tls]
+      certResolver = "default"
+
 [http.services]
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]

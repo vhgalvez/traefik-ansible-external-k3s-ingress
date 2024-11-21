@@ -1,18 +1,21 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
-
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
       certResolver = "default"
 
+[http.middlewares]
+  [http.middlewares.redirect-to-https.redirectScheme]
+    scheme = "https"
+
 [api]
   dashboard = true
-  insecure = true
+  insecure = false
 
 [log]
-  level = "DEBUG"
+  level = "INFO"
 
 [providers]
   [providers.docker]
@@ -20,35 +23,18 @@
     watch = true
     exposedByDefault = false
 
-[http.routers]
-  [http.routers.whoami]
-    entryPoints = ["web"]
-    rule = "Host(`whoami.localhost`)"
-    service = "whoami"
-
-  [http.routers.whoami-secure]
-    entryPoints = ["websecure"]
-    rule = "Host(`whoami.localhost`)"
-    service = "whoami"
-    [http.routers.whoami-secure.tls]
-      certResolver = "default"
-
-  [http.routers.k8sApi]
-    entryPoints = ["websecure"]
-    rule = "Host(`k8sapi.cefaslocalserver.com`)"
-    service = "k8sApi"
-    [http.routers.k8sApi.tls]
-      certResolver = "default"
-
-[http.services]
-  [http.services.whoami.loadBalancer]
-    [[http.services.whoami.loadBalancer.servers]]
-      url = "http://simple-service:80"
+[tls.options]
+  [tls.options.default]
+    minVersion = "VersionTLS12"
+    cipherSuites = [
+      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+    ]
 
 [certificatesResolvers]
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
-      email = "tu-email@dominio.com"
+      email = "{{ letsencrypt_email }}"
       storage = "/etc/traefik/letsencrypt/acme.json"
       caServer = "https://acme-v02.api.letsencrypt.org/directory"
       httpChallenge = {}

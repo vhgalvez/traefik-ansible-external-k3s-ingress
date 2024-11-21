@@ -9,14 +9,12 @@
     docker_compose_file: /etc/traefik/docker-compose.yml
     acme_file: /etc/traefik/letsencrypt/acme.json
     traefik_toml_file: /etc/traefik/traefik.toml
+    dynamic_conf_file: /etc/traefik/dynamic_conf.toml
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
-    traefik_domain: "loadbalancer1.cefaslocalserver.com"
-    whoami_host: "whoami.localhost"
-    cert_whoami_key: "{{ certs_dir }}/whoami.localhost.key"
-    cert_whoami_crt: "{{ certs_dir }}/whoami.localhost.crt"
-    cert_loadbalancer_key: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.key"
-    cert_loadbalancer_crt: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.crt"
+    traefik_domain: "cefaslocalserver.com"
+    cert_wildcard_key: "{{ certs_dir }}/wildcard.cefaslocalserver.com.key"
+    cert_wildcard_crt: "{{ certs_dir }}/wildcard.cefaslocalserver.com.crt"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -76,15 +74,12 @@
         - "{{ letsencrypt_dir }}"
         - "{{ certs_dir }}"
 
-    - name: Crear certificados autofirmados
+    - name: Crear certificado wildcard para *.cefaslocalserver.com
       ansible.builtin.command:
         cmd: >
           openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ item.key }} -out {{ item.crt }}
-          -subj "/CN={{ item.cn }}"
-      with_items:
-        - { key: "{{ cert_whoami_key }}", crt: "{{ cert_whoami_crt }}", cn: "whoami.localhost" }
-        - { key: "{{ cert_loadbalancer_key }}", crt: "{{ cert_loadbalancer_crt }}", cn: "loadbalancer1.cefaslocalserver.com" }
+          -keyout {{ cert_wildcard_key }} -out {{ cert_wildcard_crt }}
+          -subj "/CN=*.cefaslocalserver.com"
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
@@ -96,6 +91,11 @@
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_toml_file }}"
+
+    - name: Crear archivo dynamic_conf.toml
+      ansible.builtin.template:
+        src: templates/dynamic_conf.toml.j2
+        dest: "{{ dynamic_conf_file }}"
 
     - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
