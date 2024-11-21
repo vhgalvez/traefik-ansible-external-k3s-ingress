@@ -5,6 +5,9 @@
     address = ":443"
     [entryPoints.websecure.http.tls]
       certResolver = "default"
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
+        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
 
 [http.middlewares]
   [http.middlewares.redirect-to-https.redirectScheme]
