@@ -16,6 +16,9 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.default.acme.email={{ letsencrypt_email }}"
+      - "--certificatesresolvers.default.acme.storage=/etc/traefik/letsencrypt/acme.json"
+      - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
     ports:
       - "80:80"
       - "443:443"
@@ -23,7 +26,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "/etc/traefik/traefik.toml:/traefik.toml:ro"
-      - "/etc/traefik:/etc/traefik"ración
+      - "/etc/traefik:/etc/traefik"
     networks:
       - traefik-net
     restart: always
