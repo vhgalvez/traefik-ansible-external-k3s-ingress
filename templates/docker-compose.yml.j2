@@ -36,8 +36,8 @@ services:
     container_name: "simple-service"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
-      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.localhost`)"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.cefaslocalserver.com`)"
+      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.cefaslocalserver.com`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
       - "traefik.http.routers.whoami.entrypoints=web"
     networks:
