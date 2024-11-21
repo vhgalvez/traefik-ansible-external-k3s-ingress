@@ -41,4 +41,5 @@
       email = "{{ letsencrypt_email }}"
       storage = "/etc/traefik/letsencrypt/acme.json"
       caServer = "https://acme-v02.api.letsencrypt.org/directory"
-      httpChallenge = {}
+      [certificatesResolvers.default.acme.httpChallenge]
+        entryPoint = "web"

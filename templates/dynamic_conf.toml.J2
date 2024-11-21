@@ -17,3 +17,5 @@
       path = "/healthz"
       interval = "10s"
       timeout = "5s"
+      [http.services.k8sApi.loadBalancer.serverTransport]
+        insecureSkipVerify = true
