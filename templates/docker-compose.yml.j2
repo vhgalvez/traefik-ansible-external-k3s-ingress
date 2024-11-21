@@ -19,13 +19,13 @@ services:
       - "--certificatesresolvers.default.acme.email={{ letsencrypt_email }}"
       - "--certificatesresolvers.default.acme.storage=/etc/traefik/letsencrypt/acme.json"
       - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
+      - "--log.level=INFO"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/etc/traefik/traefik.toml:/traefik.toml:ro"
       - "/etc/traefik:/etc/traefik"
     networks:
       - traefik-net
@@ -40,6 +40,7 @@ services:
       - "traefik.http.routers.whoami-secure.rule=Host(`whoami.cefaslocalserver.com`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
       - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami-secure.tls.certresolver=default"
     networks:
       - traefik-net
     restart: always

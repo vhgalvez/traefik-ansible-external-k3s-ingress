@@ -5,17 +5,16 @@
   [http.routers.k8sApi.tls]
     certResolver = "default"
 
-[http.services]
-  [http.services.k8sApi.loadBalancer]
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master1.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master2.cefaslocalserver.com:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master3.cefaslocalserver.com:6443"
-    [http.services.k8sApi.loadBalancer.healthCheck]
-      path = "/healthz"
-      interval = "10s"
-      timeout = "5s"
-      [http.services.k8sApi.loadBalancer.serverTransport]
-        insecureSkipVerify = true
+[http.services.k8sApi.loadBalancer]
+  [[http.services.k8sApi.loadBalancer.servers]]
+    url = "https://master1.cefaslocalserver.com:6443"
+  [[http.services.k8sApi.loadBalancer.servers]]
+    url = "https://master2.cefaslocalserver.com:6443"
+  [[http.services.k8sApi.loadBalancer.servers]]
+    url = "https://master3.cefaslocalserver.com:6443"
+  [http.services.k8sApi.loadBalancer.healthCheck]
+    path = "/healthz"
+    interval = "10s"
+    timeout = "5s"
+    tls:
+      insecureSkipVerify: true
