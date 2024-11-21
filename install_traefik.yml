@@ -1,5 +1,5 @@
 ---
-- name: Instalación y configuración de Traefik en LoadBalancer1
+- name: Instalación y configuración de Traefik en los balanceadores de carga
   hosts: loadbalancer
   become: true
   vars:
@@ -12,22 +12,12 @@
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "loadbalancer1.cefaslocalserver.com"
-    whoami_host: "whoami.localhost"
-    cert_whoami_key: "{{ certs_dir }}/whoami.localhost.key"
-    cert_whoami_crt: "{{ certs_dir }}/whoami.localhost.crt"
-    cert_loadbalancer_key: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.key"
-    cert_loadbalancer_crt: "{{ certs_dir }}/loadbalancer1.cefaslocalserver.com.crt"
     firewall_ports:
       - 80/tcp
       - 443/tcp
       - 8080/tcp
 
   tasks:
-    - name: Actualizar paquetes del sistema
-      ansible.builtin.yum:
-        name: "*"
-        state: latest
-
     - name: Instalar dependencias necesarias
       ansible.builtin.yum:
         name:
@@ -38,25 +28,9 @@
           - net-tools
         state: present
 
-    - name: Configurar el repositorio de Docker
-      ansible.builtin.shell: |
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-
     - name: Instalar Docker
       ansible.builtin.shell: |
         dnf install -y docker-ce docker-ce-cli containerd.io
-
-    - name: Iniciar y habilitar Docker
-      ansible.builtin.systemd:
-        name: docker
-        state: started
-        enabled: true
-
-    - name: Añadir usuario al grupo docker
-      ansible.builtin.user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: true
 
     - name: Crear directorios necesarios
       ansible.builtin.file:
@@ -70,22 +44,6 @@
         - "{{ letsencrypt_dir }}"
         - "{{ certs_dir }}"
 
-    - name: Crear certificados autofirmados
-      ansible.builtin.command:
-        cmd: >
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ item.key }} -out {{ item.crt }}
-          -subj "/CN={{ item.cn }}"
-      with_items:
-        - { key: "{{ cert_whoami_key }}", crt: "{{ cert_whoami_crt }}", cn: "whoami.localhost" }
-        - { key: "{{ cert_loadbalancer_key }}", crt: "{{ cert_loadbalancer_crt }}", cn: "loadbalancer1.cefaslocalserver.com" }
-
-    - name: Crear archivo acme.json
-      ansible.builtin.file:
-        path: "{{ acme_file }}"
-        state: touch
-        mode: '0600'
-
     - name: Crear archivo traefik.toml
       ansible.builtin.template:
         src: templates/traefik.toml.j2
@@ -95,10 +53,6 @@
       ansible.builtin.template:
         src: templates/docker-compose.yml.j2
         dest: "{{ docker_compose_file }}"
-
-    - name: Verificar la ejecución de Docker Compose
-      ansible.builtin.command:
-        cmd: docker compose version
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.shell:
@@ -111,16 +65,3 @@
         permanent: true
         state: enabled
       loop: "{{ firewall_ports }}"
-      notify: Reload firewall
-
-    - name: Agregar entradas en /etc/hosts
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        line: "{{ ansible_host }} {{ whoami_host }} {{ traefik_domain }}"
-        state: present
-
-  handlers:
-    - name: Reload firewall
-      ansible.builtin.service:
-        name: firewalld
-        state: reloaded
