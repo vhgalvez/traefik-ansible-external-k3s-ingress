@@ -9,20 +9,21 @@ services:
     image: "{{ traefik_docker_image }}"
     container_name: "traefik"
     command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
+      - "--api.dashboard=true"                # Habilita el dashboard de Traefik
+      - "--providers.docker=true"             # Habilita la integración con Docker
+      - "--providers.file.directory=/etc/traefik" # Habilita configuraciones dinámicas desde archivos
+      - "--entrypoints.web.address=:80"       # Define el puerto para tráfico HTTP
+      - "--entrypoints.websecure.address=:443" # Define el puerto para tráfico HTTPS
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure" # Redirige HTTP a HTTPS
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https" # Forza HTTPS
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "80:80"                               # Expone el puerto HTTP
+      - "443:443"                             # Expone el puerto HTTPS
+      - "8080:8080"                           # Puerto para el dashboard (restringido)
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/etc/traefik/certs:/certs"
-      - "/etc/traefik/traefik.toml:/traefik.toml"
-      - "/etc/traefik:/etc/traefik"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Conexión al socket de Docker
+      - "/etc/traefik/traefik.toml:/traefik.toml:ro"  # Archivo principal de configuración
+      - "/etc/traefik:/etc/traefik"                  # Montaje del directorio de configuración
     networks:
       - traefik-net
     restart: always
