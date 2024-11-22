@@ -10,7 +10,7 @@
   # Router para la API de Kubernetes
   [http.routers.k8sApi]
     entryPoints = ["websecure"]
-    rule = "Host(`k8sapi.cefaslocalserver.com`)"
+    rule = "Host(`k8sapi.{{ traefik_domain }}`)"
     service = "k8sApi"
     [http.routers.k8sApi.tls]
       certResolver = "default"
@@ -18,7 +18,7 @@
   # Router para la aplicación web en NGINX
   [http.routers.cefas]
     entryPoints = ["websecure"]
-    rule = "Host(`cefaslocalserver.com`)"
+    rule = "Host(`{{ traefik_domain }}`)"
     service = "nginx"
     [http.routers.cefas.tls]
       certResolver = "default"
@@ -32,11 +32,11 @@
   # Servicio para la API de Kubernetes
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master1.cefaslocalserver.com:6443"
+      url = "https://10.17.4.21:6443"
     [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master2.cefaslocalserver.com:6443"
+      url = "https://10.17.4.22:6443"
     [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://master3.cefaslocalserver.com:6443"
+      url = "https://10.17.4.23:6443"
     [http.services.k8sApi.loadBalancer.healthCheck]
       path = "/healthz"
       interval = "10s"
