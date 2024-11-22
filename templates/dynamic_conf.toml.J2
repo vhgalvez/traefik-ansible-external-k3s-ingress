@@ -1,4 +1,5 @@
 [http.routers]
+  # Router para el servicio Whoami
   [http.routers.whoami]
     entryPoints = ["websecure"]
     rule = "Host(`whoami.cefaslocalserver.com`)"
@@ -6,6 +7,7 @@
     [http.routers.whoami.tls]
       certResolver = "default"
 
+  # Router para la API de Kubernetes
   [http.routers.k8sApi]
     entryPoints = ["websecure"]
     rule = "Host(`k8sapi.cefaslocalserver.com`)"
@@ -13,11 +15,21 @@
     [http.routers.k8sApi.tls]
       certResolver = "default"
 
+  # Router para la aplicación web en NGINX
+  [http.routers.cefas]
+    entryPoints = ["websecure"]
+    rule = "Host(`cefaslocalserver.com`)"
+    service = "nginx"
+    [http.routers.cefas.tls]
+      certResolver = "default"
+
 [http.services]
+  # Servicio para Whoami
   [http.services.whoami.loadBalancer]
     [[http.services.whoami.loadBalancer.servers]]
       url = "http://simple-service:80"
 
+  # Servicio para la API de Kubernetes
   [http.services.k8sApi.loadBalancer]
     [[http.services.k8sApi.loadBalancer.servers]]
       url = "https://master1.cefaslocalserver.com:6443"
@@ -31,3 +43,8 @@
       timeout = "5s"
     [http.services.k8sApi.loadBalancer.server.tls]
       insecureSkipVerify = true
+
+  # Servicio para la aplicación web en NGINX
+  [http.services.nginx.loadBalancer]
+    [[http.services.nginx.loadBalancer.servers]]
+      url = "http://nginx.default.svc.cluster.local:80"
