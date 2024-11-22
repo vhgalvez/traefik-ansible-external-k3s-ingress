@@ -74,12 +74,18 @@
         - "{{ letsencrypt_dir }}"
         - "{{ certs_dir }}"
 
-    - name: Crear certificado wildcard para *.cefaslocalserver.com
+    - name: Verificar si el certificado wildcard ya existe
+      ansible.builtin.stat:
+        path: "{{ cert_wildcard_crt }}"
+      register: wildcard_cert
+
+    - name: Crear certificado wildcard para *.{{ traefik_domain }}
       ansible.builtin.command:
         cmd: >
           openssl req -x509 -nodes -days 365 -newkey rsa:2048
           -keyout {{ cert_wildcard_key }} -out {{ cert_wildcard_crt }}
-          -subj "/CN=*.cefaslocalserver.com"
+          -subj "/CN=*.{{ traefik_domain }}"
+      when: not wildcard_cert.stat.exists
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
