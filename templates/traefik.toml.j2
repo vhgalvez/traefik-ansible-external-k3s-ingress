@@ -5,9 +5,6 @@
     address = ":443"
     [entryPoints.websecure.http.tls]
       certResolver = "default"
-      [[entryPoints.websecure.http.tls.certificates]]
-        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
-        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
 
 [http.middlewares]
   [http.middlewares.redirect-to-https.redirectScheme]
@@ -30,6 +27,13 @@
     filename = "/etc/traefik/dynamic_conf.toml"
     watch = true
 
+[tls]
+  [tls.stores]
+    [tls.stores.default]
+      [tls.stores.default.defaultCertificate]
+        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
+        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
+
 [tls.options]
   [tls.options.default]
     minVersion = "VersionTLS12"
@@ -41,8 +45,7 @@
 [certificatesResolvers]
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
-      email = "{{ letsencrypt_email }}"
+      email = "tu-email@dominio.com"
       storage = "/etc/traefik/letsencrypt/acme.json"
-      caServer = "https://acme-v02.api.letsencrypt.org/directory"
       [certificatesResolvers.default.acme.httpChallenge]
         entryPoint = "web"
