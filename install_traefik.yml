@@ -4,17 +4,11 @@
   become: true
   vars:
     traefik_config_dir: /etc/traefik
-    letsencrypt_dir: /etc/traefik/letsencrypt
-    certs_dir: /etc/traefik/certs
     docker_compose_file: /etc/traefik/docker-compose.yml
-    acme_file: /etc/traefik/letsencrypt/acme.json
-    traefik_toml_file: /etc/traefik/traefik.toml
-    dynamic_conf_file: /etc/traefik/dynamic_conf.toml
+    acme_file: /etc/traefik/acme.json
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "cefaslocalserver.com"
-    cert_wildcard_key: "{{ certs_dir }}/wildcard.cefaslocalserver.com.key"
-    cert_wildcard_crt: "{{ certs_dir }}/wildcard.cefaslocalserver.com.crt"
     firewall_ports:
       - 80/tcp
       - 443/tcp
@@ -32,7 +26,6 @@
           - epel-release
           - wget
           - vim
-          - openssl
           - net-tools
         state: present
 
@@ -50,58 +43,19 @@
         state: started
         enabled: true
 
-    - name: Verificar si Docker Compose está disponible
-      ansible.builtin.command:
-        cmd: docker compose version
-      ignore_errors: yes
-      register: compose_check
-
-    - name: Instalar Docker Compose manualmente si no está disponible
-      ansible.builtin.shell: |
-        curl -L "https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        chmod +x /usr/local/bin/docker-compose
-      when: compose_check.rc != 0
-
     - name: Crear directorios necesarios
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: "{{ traefik_config_dir }}"
         state: directory
         owner: root
         group: root
         mode: '0755'
-      loop:
-        - "{{ traefik_config_dir }}"
-        - "{{ letsencrypt_dir }}"
-        - "{{ certs_dir }}"
-
-    - name: Verificar si el certificado wildcard ya existe
-      ansible.builtin.stat:
-        path: "{{ cert_wildcard_crt }}"
-      register: wildcard_cert
-
-    - name: Crear certificado wildcard para *.{{ traefik_domain }}
-      ansible.builtin.command:
-        cmd: >
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048
-          -keyout {{ cert_wildcard_key }} -out {{ cert_wildcard_crt }}
-          -subj "/CN=*.{{ traefik_domain }}"
-      when: not wildcard_cert.stat.exists
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
         state: touch
         mode: '0600'
-
-    - name: Crear archivo traefik.toml
-      ansible.builtin.template:
-        src: templates/traefik.toml.j2
-        dest: "{{ traefik_toml_file }}"
-
-    - name: Crear archivo dynamic_conf.toml
-      ansible.builtin.template:
-        src: templates/dynamic_conf.toml.j2
-        dest: "{{ dynamic_conf_file }}"
 
     - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
