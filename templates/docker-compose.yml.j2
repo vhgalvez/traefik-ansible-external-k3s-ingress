@@ -1,44 +1,35 @@
 version: "3.9"
 
-networks:
-  traefik-net:
-    driver: bridge
-
 services:
-  traefik:
+  reverse-proxy:
     image: "traefik:v3.2"
-    container_name: "traefik"
     command:
-      - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.file.directory=/etc/traefik"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--certificatesresolvers.default.acme.email={{ letsencrypt_email }}"
-      - "--certificatesresolvers.default.acme.storage=/etc/traefik/letsencrypt/acme.json"
-      - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
+      - --log.level=info
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.default.acme.email=victory@cefaslocalserver.com
+      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
+      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.http.tls=true
+
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "80:80"      # HTTP port
+      - "443:443"    # HTTPS port
+      - "8080:8080"  # Web UI (Dashboard)
+
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/etc/traefik:/etc/traefik"
-    networks:
-      - traefik-net
-    restart: always
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik
 
   whoami:
-    image: "traefik/whoami"
-    container_name: "simple-service"
+    image: containous/whoami
     labels:
-      - "traefik.enable=true"
       - "traefik.http.routers.whoami.rule=Host(`whoami.cefaslocalserver.com`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami-secure.rule=Host(`whoami.cefaslocalserver.com`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
-      - "traefik.http.routers.whoami.entrypoints=web"
-    networks:
-      - traefik-net
-    restart: always
+      - "traefik.http.routers.whoami-secure.tls=true"
