@@ -1,3 +1,4 @@
+# Configuración de los entrypoints para Traefik
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -14,27 +15,34 @@
   [entryPoints.k8sApi]
     address = ":6443"
 
+# Configuración de logs
 [log]
   level = "INFO"
 
+# Configuración del panel de control de Traefik
 [api]
   dashboard = true
   insecure = false
 
+# Configuración de proveedores de servicios
 [providers]
+  # Proveedor Docker
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
+  # Proveedor Kubernetes CRD
   [providers.kubernetesCRD]
     endpoint = "https://{{ k3s_master_ip }}:6443"
     token = "{{ k3s_token.stdout }}"
     certAuthFilePath = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
 
+  # Proveedor de configuración por archivos dinámicos
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
 
+# Configuración de certificados TLS
 [tls]
   [tls.stores]
     [tls.stores.default]
@@ -52,3 +60,13 @@
         "TLS_AES_128_GCM_SHA256",
         "TLS_AES_256_GCM_SHA384"
       ]
+
+# Configuración de certificados Let's Encrypt
+[certificatesResolvers]
+  [certificatesResolvers.default]
+    [certificatesResolvers.default.acme]
+      email = "{{ letsencrypt_email }}"
+      storage = "/etc/traefik/acme.json"
+      caServer = "https://acme-v02.api.letsencrypt.org/directory"
+      [certificatesResolvers.default.acme.httpChallenge]
+        entryPoint = "web"

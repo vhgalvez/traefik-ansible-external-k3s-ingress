@@ -17,13 +17,12 @@
     k3s_master_ip: "10.17.4.21"
     k3s_cert_path: "/var/lib/rancher/k3s/server/tls/server-ca.crt"
     traefik_k8s_cert_path: "/etc/traefik/k8s-ca.crt"
-    docker_compose_version: "2.27.0"
-  
+
   tasks:
-    - name: Obtener el token de K3s desde el master
+    - name: Obtener el token de K3s desde el master sin Python
       delegate_to: "{{ k3s_master_ip }}"
       become: true
-      command: >
+      raw: |
         kubectl get secret $(kubectl get sa traefik-sa -n kube-system -o jsonpath="{.secrets[0].name}") -n kube-system -o jsonpath="{.data.token}" | base64 --decode
       register: k3s_token
       changed_when: false
