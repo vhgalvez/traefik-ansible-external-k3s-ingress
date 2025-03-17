@@ -2,7 +2,6 @@
 - name: Instalación y configuración de Traefik en los Balanceadores de Carga
   hosts: loadbalancer
   become: true
-
   vars:
     traefik_config_dir: /etc/traefik
     docker_compose_file: /etc/traefik/docker-compose.yml
@@ -14,22 +13,36 @@
       - 80/tcp
       - 443/tcp
       - 8080/tcp
-      - 6443/tcp  # Puerto de la API de Kubernetes
+      - 6443/tcp
 
   tasks:
     - name: Verificar si K3s está corriendo antes de instalar Traefik
-      ansible.builtin.raw: systemctl is-active --quiet k3s && echo "running" || echo "stopped"
+      command: "systemctl is-active k3s"
       register: k3s_status
-      changed_when: false
-      delegate_to: "{{ groups['masters'][0] }}"
-      run_once: true
+      delegate_to: "{{ groups['masters'] | first }}"
+      ignore_errors: true
 
-    - name: Detener si K3s no está corriendo
-      ansible.builtin.fail:
-        msg: "K3s no está corriendo. No se instalará Traefik."
-      when: k3s_status.stdout == "stopped"
+    - name: Fallar si K3s no está en ejecución
+      fail:
+        msg: "K3s no está corriendo en el nodo maestro, verifica la instalación antes de instalar Traefik."
+      when: k3s_status.rc != 0
 
-    - name: Instalar Docker y dependencias
+    - name: Instalar paquetes necesarios
+      ansible.builtin.yum:
+        name:
+          - epel-release
+          - yum-utils
+          - net-tools
+          - vim
+          - curl
+          - wget
+        state: present
+
+    - name: Agregar el repositorio de Docker
+      ansible.builtin.shell: |
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Instalar Docker y Docker Compose
       ansible.builtin.yum:
         name:
           - docker-ce
@@ -53,21 +66,30 @@
         - "{{ traefik_config_dir }}"
         - "{{ traefik_config_dir }}/ssl"
 
+    - name: Copiar certificados SSL personalizados
+      ansible.builtin.copy:
+        src: "files/ssl/{{ item }}"
+        dest: "/etc/traefik/ssl/{{ item }}"
+        mode: '0600'
+      loop:
+        - cefaslocalserver.com.crt
+        - cefaslocalserver.com.key
+
     - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ acme_file }}"
         state: touch
         mode: '0600'
 
-    - name: Copiar configuración de Traefik
-      ansible.builtin.template:
-        src: templates/traefik.toml.j2
-        dest: "{{ traefik_config_dir }}/traefik.toml"
-
     - name: Copiar configuración de Docker Compose
       ansible.builtin.template:
         src: templates/docker-compose.yml.j2
         dest: "{{ docker_compose_file }}"
+
+    - name: Copiar configuración de Traefik
+      ansible.builtin.template:
+        src: templates/traefik.toml.j2
+        dest: "{{ traefik_config_dir }}/traefik.toml"
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.shell:
