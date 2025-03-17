@@ -14,7 +14,7 @@
       - 80/tcp
       - 443/tcp
       - 8080/tcp
-      - 6443/tcp  # Kubernetes API
+      - 6443/tcp  # Puerto de la API de Kubernetes
 
   tasks:
     - name: Verificar si K3s está corriendo antes de instalar Traefik
