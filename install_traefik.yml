@@ -4,13 +4,9 @@
   become: true
   vars:
     traefik_config_dir: /etc/traefik
-    docker_compose_file: /etc/traefik/docker-compose.yml
-    acme_file: /etc/traefik/acme.json
-    traefik_docker_image: "traefik:v3.2"
-    letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "cefaslocalserver.com"
+    letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
-    docker_compose_version: "2.27.0"
 
   tasks:
     - name: Obtener el token de K3s desde el master sin Python
@@ -51,6 +47,18 @@
         dest: "{{ traefik_config_dir }}/k8s-ca.crt"
         mode: "0600"
 
+    - name: Verificar que el archivo `k3s_token` existe en los balanceadores
+      ansible.builtin.stat:
+        path: "{{ traefik_config_dir }}/k3s_token"
+      register: k3s_token_check
+      failed_when: not k3s_token_check.stat.exists
+
+    - name: Verificar que el archivo `k8s-ca.crt` existe en los balanceadores
+      ansible.builtin.stat:
+        path: "{{ traefik_config_dir }}/k8s-ca.crt"
+      register: k3s_cert_check
+      failed_when: not k3s_cert_check.stat.exists
+
     - name: Crear `dynamic_conf.toml` si no existe
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}/dynamic_conf.toml"
@@ -68,7 +76,7 @@
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
 
-    - name: Reiniciar contenedor de Traefik si existe
+    - name: Reiniciar Traefik
       ansible.builtin.shell:
         cmd: docker restart traefik || docker-compose up -d
         chdir: "{{ traefik_config_dir }}"
