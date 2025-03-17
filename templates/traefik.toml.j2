@@ -34,13 +34,14 @@
   # Proveedor Kubernetes CRD
   [providers.kubernetesCRD]
     endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "{{ k3s_token.stdout }}"
+    token = "{{ k3s_token }}"
     certAuthFilePath = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
 
   # Proveedor de configuración por archivos dinámicos
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
+    watch = true
 
 # Configuración de certificados TLS
 [tls]

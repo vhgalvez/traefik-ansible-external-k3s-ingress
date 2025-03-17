@@ -9,44 +9,54 @@
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "cefaslocalserver.com"
-    firewall_ports:
-      - 80/tcp
-      - 443/tcp
-      - 8080/tcp
-      - 6443/tcp
     k3s_master_ip: "10.17.4.21"
-    k3s_cert_path: "/var/lib/rancher/k3s/server/tls/server-ca.crt"
-    traefik_k8s_cert_path: "/etc/traefik/k8s-ca.crt"
+    k3s_ca_cert_path: "/var/lib/rancher/k3s/server/tls/server-ca.crt"
+    k3s_token_path: "/var/lib/rancher/k3s/server/node-token"
+    docker_compose_version: "2.27.0"
 
   tasks:
     - name: Obtener el token de K3s desde el master sin Python
+      ansible.builtin.raw: "cat {{ k3s_token_path }}"
       delegate_to: "{{ k3s_master_ip }}"
-      become: true
-      raw: |
-        kubectl get secret $(kubectl get sa traefik-sa -n kube-system -o jsonpath="{.secrets[0].name}") -n kube-system -o jsonpath="{.data.token}" | base64 --decode
       register: k3s_token
       changed_when: false
 
     - name: Copiar el certificado del API de K3s a los balanceadores
       ansible.builtin.fetch:
-        src: "{{ k3s_cert_path }}"
-        dest: "/tmp/server-ca.crt"
+        src: "{{ k3s_ca_cert_path }}"
+        dest: "/tmp/k8s-ca.crt"
         flat: true
       delegate_to: "{{ k3s_master_ip }}"
 
-    - name: Enviar certificado de K3s a los balanceadores
-      copy:
-        src: "/tmp/server-ca.crt"
-        dest: "{{ traefik_k8s_cert_path }}"
+    - name: Copiar el certificado del API de K3s a los balanceadores
+      ansible.builtin.copy:
+        src: "/tmp/k8s-ca.crt"
+        dest: "/etc/traefik/k8s-ca.crt"
+        mode: "0644"
+
+    - name: Crear directorios para Traefik
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/ssl"
+
+    - name: Crear archivo acme.json
+      ansible.builtin.file:
+        path: "{{ acme_file }}"
+        state: touch
         mode: '0600'
 
-    - name: Crear archivo `traefik.toml`
+    - name: Copiar configuración de Traefik
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
-        mode: '0644'
+      vars:
+        k3s_token: "{{ k3s_token.stdout }}"
 
     - name: Reiniciar Traefik
       ansible.builtin.shell:
-        cmd: docker-compose restart
+        cmd: "docker-compose down && docker-compose up -d"
         chdir: "{{ traefik_config_dir }}"
