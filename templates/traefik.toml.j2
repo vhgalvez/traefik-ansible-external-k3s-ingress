@@ -22,16 +22,19 @@
   insecure = false
 
 [providers]
+  # Proveedor Docker
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
+  # Proveedor Kubernetes CRD
   [providers.kubernetesCRD]
     endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "{{ k3s_token_file }}"
+    tokenFile = "{{ k3s_token_file }}"
     certAuthFilePath = "{{ k3s_cert_file }}"
     namespaces = ["default", "traefik"]
 
+  # Proveedor de configuración por archivos dinámicos
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
 
