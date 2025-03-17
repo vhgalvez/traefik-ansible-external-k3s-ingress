@@ -4,11 +4,18 @@
   become: true
   vars:
     traefik_config_dir: /etc/traefik
-    dynamic_conf_file: "/etc/traefik/dynamic_conf.toml"
-    acme_file: "/etc/traefik/acme.json"
-    k3s_token_file: "/etc/traefik/k3s_token"
-    k3s_cert_file: "/etc/traefik/k8s-ca.crt"
+    docker_compose_file: /etc/traefik/docker-compose.yml
+    acme_file: /etc/traefik/acme.json
+    traefik_docker_image: "traefik:v3.2"
+    letsencrypt_email: "tu-email@dominio.com"
+    traefik_domain: "cefaslocalserver.com"
+    firewall_ports:
+      - 80/tcp
+      - 443/tcp
+      - 8080/tcp
+      - 6443/tcp
     k3s_master_ip: "10.17.4.21"
+    docker_compose_version: "2.27.0"
 
   tasks:
     - name: Obtener el token de K3s desde el master sin Python
@@ -23,6 +30,10 @@
       register: k3s_ca_cert
       changed_when: false
 
+    - name: Definir variable con el token de K3s
+      ansible.builtin.set_fact:
+        k3s_token: "{{ k3s_token.stdout }}"
+
     - name: Asegurar que el directorio de Traefik existe
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}"
@@ -32,32 +43,25 @@
     - name: Copiar el token de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_token.stdout }}"
-        dest: "{{ k3s_token_file }}"
+        dest: "{{ traefik_config_dir }}/k3s_token"
         mode: "0600"
-      when: k3s_token.stdout is defined and k3s_token.stdout | length > 0
 
     - name: Copiar el certificado de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_ca_cert.stdout }}"
-        dest: "{{ k3s_cert_file }}"
+        dest: "{{ traefik_config_dir }}/k8s-ca.crt"
         mode: "0600"
-      when: k3s_ca_cert.stdout is defined and k3s_ca_cert.stdout | length > 0
 
     - name: Crear `dynamic_conf.toml` si no existe
       ansible.builtin.file:
-        path: "{{ dynamic_conf_file }}"
+        path: "{{ traefik_config_dir }}/dynamic_conf.toml"
         state: touch
         mode: "0600"
 
     - name: Escribir configuración inicial en `dynamic_conf.toml`
       ansible.builtin.copy:
-        dest: "{{ dynamic_conf_file }}"
-        content: |
-          # Dynamic configuration for Traefik
-          [http]
-            [http.routers]
-          [tcp]
-            [tcp.routers]
+        content: "[http.routers]\n"
+        dest: "{{ traefik_config_dir }}/dynamic_conf.toml"
         mode: "0600"
 
     - name: Copiar configuración de Traefik
@@ -65,22 +69,8 @@
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
 
-    - name: Verificar que el archivo `k3s_token` existe antes de continuar
-      ansible.builtin.stat:
-        path: "{{ k3s_token_file }}"
-      register: token_status
-
-    - name: Verificar que el archivo `k8s-ca.crt` existe antes de continuar
-      ansible.builtin.stat:
-        path: "{{ k3s_cert_file }}"
-      register: cert_status
-
-    - name: Fallar si el token de K3s no se copió correctamente
-      ansible.builtin.fail:
-        msg: "El archivo {{ k3s_token_file }} no se encontró en el balanceador. Verifica la conexión con K3s."
-      when: not token_status.stat.exists
-
-    - name: Fallar si el certificado de K3s no se copió correctamente
-      ansible.builtin.fail:
-        msg: "El archivo {{ k3s_cert_file }} no se encontró en el balanceador. Verifica la conexión con K3s."
-      when: not cert_status.stat.exists
+    - name: Reiniciar contenedor de Traefik si existe
+      ansible.builtin.shell:
+        cmd: docker restart traefik || docker-compose up -d
+        chdir: "{{ traefik_config_dir }}"
+      become: true
