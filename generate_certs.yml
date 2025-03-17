@@ -1,27 +1,63 @@
----
-- name: Generar certificados autofirmados para Traefik
-  hosts: localhost
-  become: false
-  tasks:
-    - name: Crear directorio para almacenar los certificados
-      ansible.builtin.file:
-        path: "{{ playbook_dir }}/files/ssl"
-        state: directory
-        mode: '0755'
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+    [entryPoints.web.http.redirections.entrypoint]
+      to = "websecure"
+      scheme = "https"
+      permanent = true
 
-    - name: Generar clave privada para Traefik
-      ansible.builtin.command:
-        cmd: openssl genrsa -out {{ playbook_dir }}/files/ssl/cefaslocalserver.com.key 2048
-        creates: "{{ playbook_dir }}/files/ssl/cefaslocalserver.com.key"
+  [entryPoints.websecure]
+    address = ":443"
+    [entryPoints.websecure.http.tls]
+      certResolver = "default"
 
-    - name: Generar certificado autofirmado para Traefik
-      ansible.builtin.command:
-        cmd: >
-          openssl req -x509 -new -nodes -key {{ playbook_dir }}/files/ssl/cefaslocalserver.com.key 
-          -sha256 -days 365 -out {{ playbook_dir }}/files/ssl/cefaslocalserver.com.crt 
-          -subj "/C=ES/ST=Madrid/L=Madrid/O=LocalTest/CN=cefaslocalserver.com"
-        creates: "{{ playbook_dir }}/files/ssl/cefaslocalserver.com.crt"
+  [entryPoints.k8sApi]
+    address = ":6443"
 
-    - name: Mostrar mensaje de éxito
-      ansible.builtin.debug:
-        msg: "✅ Certificados generados en 'files/ssl/' correctamente."
+[log]
+  level = "INFO"
+
+[api]
+  dashboard = true
+  insecure = false
+
+[providers]
+  [providers.docker]
+    endpoint = "unix:///var/run/docker.sock"
+    exposedByDefault = false
+
+  [providers.kubernetesCRD]
+    endpoint = "https://{{ k3s_master_ip }}:6443"
+    token = "{{ lookup('file', '/etc/traefik/k3s_token') }}"
+    certAuthFilePath = "/etc/traefik/k8s-ca.crt"
+    namespaces = ["default", "traefik"]
+
+  [providers.file]
+    filename = "/etc/traefik/dynamic_conf.toml"
+
+[tls]
+  [tls.stores]
+    [tls.stores.default]
+      [tls.stores.default.defaultCertificate]
+        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
+        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
+
+  [tls.options]
+    [tls.options.default]
+      minVersion = "VersionTLS12"
+      maxVersion = "VersionTLS13"
+      cipherSuites = [
+        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384"
+      ]
+
+[certificatesResolvers]
+  [certificatesResolvers.default]
+    [certificatesResolvers.default.acme]
+      email = "{{ letsencrypt_email }}"
+      storage = "/etc/traefik/acme.json"
+      caServer = "https://acme-v02.api.letsencrypt.org/directory"
+      [certificatesResolvers.default.acme.httpChallenge]
+        entryPoint = "web"
