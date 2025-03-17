@@ -1,0 +1,27 @@
+---
+- name: Generar certificados autofirmados para Traefik
+  hosts: localhost
+  become: false
+  tasks:
+    - name: Crear directorio para almacenar los certificados
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/files/ssl"
+        state: directory
+        mode: '0755'
+
+    - name: Generar clave privada para Traefik
+      ansible.builtin.command:
+        cmd: openssl genrsa -out {{ playbook_dir }}/files/ssl/cefaslocalserver.com.key 2048
+        creates: "{{ playbook_dir }}/files/ssl/cefaslocalserver.com.key"
+
+    - name: Generar certificado autofirmado para Traefik
+      ansible.builtin.command:
+        cmd: >
+          openssl req -x509 -new -nodes -key {{ playbook_dir }}/files/ssl/cefaslocalserver.com.key 
+          -sha256 -days 365 -out {{ playbook_dir }}/files/ssl/cefaslocalserver.com.crt 
+          -subj "/C=ES/ST=Madrid/L=Madrid/O=LocalTest/CN=cefaslocalserver.com"
+        creates: "{{ playbook_dir }}/files/ssl/cefaslocalserver.com.crt"
+
+    - name: Mostrar mensaje de éxito
+      ansible.builtin.debug:
+        msg: "✅ Certificados generados en 'files/ssl/' correctamente."

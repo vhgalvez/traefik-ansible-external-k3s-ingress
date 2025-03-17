@@ -18,6 +18,15 @@
     docker_compose_version: "2.27.0"
 
   tasks:
+    - name: Copiar certificados SSL a los balanceadores de carga
+      ansible.builtin.copy:
+        src: "files/ssl/{{ item }}"
+        dest: "/etc/traefik/ssl/{{ item }}"
+        mode: '0600'
+      loop:
+        - cefaslocalserver.com.crt
+        - cefaslocalserver.com.key
+      
     - name: Verificar si K3s está corriendo antes de instalar Traefik (sin Python)
       ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
       delegate_to: "{{ k3s_master_ip }}"
