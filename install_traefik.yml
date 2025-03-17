@@ -26,7 +26,14 @@
       loop:
         - cefaslocalserver.com.crt
         - cefaslocalserver.com.key
-      
+        
+    - name: Instalar biblioteca de firewall en los balanceadores de carga
+      ansible.builtin.yum:
+        name:
+          - python3-firewall
+        state: present
+      when: ansible_os_family == "RedHat"  
+
     - name: Verificar si K3s está corriendo antes de instalar Traefik (sin Python)
       ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
       delegate_to: "{{ k3s_master_ip }}"
