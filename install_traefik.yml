@@ -4,19 +4,11 @@
   become: true
   vars:
     traefik_config_dir: /etc/traefik
-    docker_compose_file: /etc/traefik/docker-compose.yml
     dynamic_conf_file: "/etc/traefik/dynamic_conf.toml"
     acme_file: "/etc/traefik/acme.json"
-    traefik_docker_image: "traefik:v3.2"
-    letsencrypt_email: "tu-email@dominio.com"
-    traefik_domain: "cefaslocalserver.com"
-    firewall_ports:
-      - 80/tcp
-      - 443/tcp
-      - 8080/tcp
-      - 6443/tcp
+    k3s_token_file: "/etc/traefik/k3s_token"
+    k3s_cert_file: "/etc/traefik/k8s-ca.crt"
     k3s_master_ip: "10.17.4.21"
-    docker_compose_version: "2.27.0"
 
   tasks:
     - name: Obtener el token de K3s desde el master sin Python
@@ -40,14 +32,16 @@
     - name: Copiar el token de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_token.stdout }}"
-        dest: "{{ traefik_config_dir }}/k3s_token"
+        dest: "{{ k3s_token_file }}"
         mode: "0600"
+      when: k3s_token.stdout is defined and k3s_token.stdout | length > 0
 
     - name: Copiar el certificado de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_ca_cert.stdout }}"
-        dest: "{{ traefik_config_dir }}/k8s-ca.crt"
+        dest: "{{ k3s_cert_file }}"
         mode: "0600"
+      when: k3s_ca_cert.stdout is defined and k3s_ca_cert.stdout | length > 0
 
     - name: Crear `dynamic_conf.toml` si no existe
       ansible.builtin.file:
@@ -71,26 +65,22 @@
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
 
-    - name: Copiar configuración de Docker Compose
-      ansible.builtin.template:
-        src: templates/docker-compose.yml.j2
-        dest: "{{ docker_compose_file }}"
+    - name: Verificar que el archivo `k3s_token` existe antes de continuar
+      ansible.builtin.stat:
+        path: "{{ k3s_token_file }}"
+      register: token_status
 
-    - name: Reiniciar Traefik con Docker Compose
-      ansible.builtin.shell:
-        cmd: docker-compose down && docker-compose up -d
-        chdir: "{{ traefik_config_dir }}"
+    - name: Verificar que el archivo `k8s-ca.crt` existe antes de continuar
+      ansible.builtin.stat:
+        path: "{{ k3s_cert_file }}"
+      register: cert_status
 
-    - name: Configurar firewall (abrir puertos necesarios)
-      ansible.builtin.firewalld:
-        port: "{{ item }}"
-        permanent: true
-        state: enabled
-      loop: "{{ firewall_ports }}"
-      notify: Reload firewall
+    - name: Fallar si el token de K3s no se copió correctamente
+      ansible.builtin.fail:
+        msg: "El archivo {{ k3s_token_file }} no se encontró en el balanceador. Verifica la conexión con K3s."
+      when: not token_status.stat.exists
 
-  handlers:
-    - name: Reload firewall
-      ansible.builtin.systemd:
-        name: firewalld
-        state: reloaded
+    - name: Fallar si el certificado de K3s no se copió correctamente
+      ansible.builtin.fail:
+        msg: "El archivo {{ k3s_cert_file }} no se encontró en el balanceador. Verifica la conexión con K3s."
+      when: not cert_status.stat.exists
