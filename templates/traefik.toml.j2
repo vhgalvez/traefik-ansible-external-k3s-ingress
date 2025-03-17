@@ -1,3 +1,5 @@
+# Configuración de Traefik
+
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -22,15 +24,22 @@
   insecure = false
 
 [providers]
+  # Proveedor Docker
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
+  # Proveedor KubernetesCRD
   [providers.kubernetesCRD]
-    ingressClass = "traefik"
+    endpoint = "https://10.17.4.21:6443"
+    tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    certAuthFilePath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    namespaces = ["default", "traefik"]
 
+  # Proveedor de configuración estática
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
+    watch = true
 
 [tls]
   [tls.stores]

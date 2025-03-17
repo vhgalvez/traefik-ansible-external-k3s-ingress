@@ -18,6 +18,12 @@
     docker_compose_version: "2.27.0"
 
   tasks:
+    - name: Crear archivo de configuración dinámico vacío si no existe
+      ansible.builtin.file:
+        path: "/etc/traefik/dynamic_conf.toml"
+        state: touch
+        mode: '0600'
+
     - name: Instalar firewalld en los balanceadores de carga
       ansible.builtin.yum:
         name: firewalld
