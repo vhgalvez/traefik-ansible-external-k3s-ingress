@@ -110,3 +110,5 @@ Copiar código
 10.17.3.12 whoami.localhost
 
 
+
+![alt text](install_traefik.png)
