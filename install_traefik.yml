@@ -18,12 +18,17 @@
     docker_compose_version: "2.27.0"
 
   tasks:
-    - name: Obtener el token de K3s para Traefik desde el master
-      delegate_to: "{{ k3s_master_ip }}"
+    - name: Obtener el token de K3s para Traefik desde el master sin Python
+      delegate_to: 10.17.4.21
       run_once: true
-      ansible.builtin.shell: |
+      ansible.builtin.raw: |
         kubectl get secret $(kubectl get sa traefik-sa -n kube-system -o jsonpath="{.secrets[0].name}") -n kube-system -o jsonpath="{.data.token}" | base64 --decode
       register: k3s_token
+      changed_when: false
+
+    - name: Mostrar el token obtenido
+      ansible.builtin.debug:
+        msg: "El token de K3s obtenido es: {{ k3s_token.stdout }}"
 
     - name: Crear archivo de configuración dinámico vacío si no existe
       ansible.builtin.file:
