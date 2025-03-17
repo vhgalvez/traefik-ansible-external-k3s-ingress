@@ -1,91 +1,89 @@
-[entryPoints]
-  [entryPoints.web]
-    address = ":80"
-    [entryPoints.web.http.redirections.entrypoint]
-      to = "websecure"
-      scheme = "https"
-      permanent = true
+---
+- name: Instalación y configuración de Traefik en los Balanceadores de Carga
+  hosts: loadbalancer
+  become: true
 
-  [entryPoints.websecure]
-    address = ":443"
-    [entryPoints.websecure.http.tls]
-      certResolver = "default"
+  vars:
+    traefik_config_dir: /etc/traefik
+    docker_compose_file: /etc/traefik/docker-compose.yml
+    acme_file: /etc/traefik/acme.json
+    traefik_docker_image: "traefik:v3.2"
+    letsencrypt_email: "tu-email@dominio.com"
+    traefik_domain: "cefaslocalserver.com"
+    firewall_ports:
+      - 80/tcp
+      - 443/tcp
+      - 8080/tcp
+      - 6443/tcp  # Kubernetes API
 
-  [entryPoints.k8sApi]
-    address = ":6443"
+  tasks:
+    - name: Verificar si K3s está corriendo antes de instalar Traefik
+      ansible.builtin.raw: systemctl is-active --quiet k3s && echo "running" || echo "stopped"
+      register: k3s_status
+      changed_when: false
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
 
-[log]
-  level = "INFO"
+    - name: Detener si K3s no está corriendo
+      ansible.builtin.fail:
+        msg: "K3s no está corriendo. No se instalará Traefik."
+      when: k3s_status.stdout == "stopped"
 
-[api]
-  dashboard = true
-  insecure = false
+    - name: Instalar Docker y dependencias
+      ansible.builtin.yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose
+        state: present
 
-[providers]
-  [providers.docker]
-    endpoint = "unix:///var/run/docker.sock"
-    watch = true
-    exposedByDefault = false
+    - name: Iniciar y habilitar Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
 
-  [providers.file]
-    filename = "/etc/traefik/dynamic_conf.toml"
-    watch = true
+    - name: Crear directorios para Traefik
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/ssl"
 
-[tls]
-  [tls.stores]
-    [tls.stores.default]
-      [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
-        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
+    - name: Crear archivo acme.json
+      ansible.builtin.file:
+        path: "{{ acme_file }}"
+        state: touch
+        mode: '0600'
 
-  [tls.options]
-    [tls.options.default]
-      minVersion = "VersionTLS12"
-      maxVersion = "VersionTLS13"
-      cipherSuites = [
-        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-        "TLS_AES_128_GCM_SHA256",
-        "TLS_AES_256_GCM_SHA384"
-      ]
+    - name: Copiar configuración de Traefik
+      ansible.builtin.template:
+        src: templates/traefik.toml.j2
+        dest: "{{ traefik_config_dir }}/traefik.toml"
 
-[certificatesResolvers]
-  [certificatesResolvers.default]
-    [certificatesResolvers.default.acme]
-      email = "{{ letsencrypt_email }}"
-      storage = "/etc/traefik/acme.json"
-      caServer = "https://acme-v02.api.letsencrypt.org/directory"
-      [certificatesResolvers.default.acme.httpChallenge]
-        entryPoint = "web"
+    - name: Copiar configuración de Docker Compose
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ docker_compose_file }}"
 
-[http.middlewares]
-  [http.middlewares.redirect-to-https.redirectScheme]
-    scheme = "https"
-    permanent = true
+    - name: Iniciar Traefik con Docker Compose
+      ansible.builtin.shell:
+        cmd: docker-compose up -d
+        chdir: "{{ traefik_config_dir }}"
 
-[http.routers]
-  [http.routers.api]
-    entryPoints = ["websecure"]
-    service = "api@internal"
-    rule = "Host(`traefik.cefaslocalserver.com`)"
-    [http.routers.api.tls]
-      certResolver = "default"
+    - name: Configurar firewall
+      ansible.builtin.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop: "{{ firewall_ports }}"
+      notify: Reload firewall
 
-  [http.routers.k8sApi]
-    entryPoints = ["k8sApi"]
-    service = "k8sApi"
-    rule = "Host(`api.local.cefaslocalserver.com`)"
-    [http.routers.k8sApi.tls]
-      certResolver = "default"
-      [[tls.certificates]]
-        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
-        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
-
-[http.services]
-  [http.services.k8sApi.loadBalancer]
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://10.17.4.21:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://10.17.4.22:6443"
-    [[http.services.k8sApi.loadBalancer.servers]]
-      url = "https://10.17.4.23:6443"
+  handlers:
+    - name: Reload firewall
+      ansible.builtin.service:
+        name: firewalld
+        state: reloaded

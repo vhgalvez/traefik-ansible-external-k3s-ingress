@@ -4,25 +4,23 @@ services:
   traefik:
     image: "{{ traefik_docker_image }}"
     container_name: traefik
+    restart: always
     command:
-      - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.file.filename=/etc/traefik/dynamic_conf.toml"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.default.acme.email={{ letsencrypt_email }}"
-      - "--certificatesresolvers.default.acme.storage=/etc/traefik/acme.json"
-      - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
-
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.kubernetesingress=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.default.acme.email={{ letsencrypt_email }}
+      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
+      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.http.tls=true
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
-
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /etc/traefik/traefik.toml:/traefik.toml
-      - /etc/traefik/dynamic_conf.toml:/dynamic_conf.toml
-      - /etc/traefik/acme.json:/acme.json
-      - /etc/traefik/ssl:/etc/traefik/ssl
-    restart: always
+      - "{{ traefik_config_dir }}:/etc/traefik"

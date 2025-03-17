@@ -1,27 +1,35 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
+    [entryPoints.web.http.redirections.entrypoint]
+      to = "websecure"
+      scheme = "https"
+      permanent = true
+
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
       certResolver = "default"
 
-[http.middlewares]
-  [http.middlewares.redirect-to-https.redirectScheme]
-    scheme = "https"
-
-[api]
-  dashboard = true
-  insecure = true
+  [entryPoints.k8sApi]
+    address = ":6443"
 
 [log]
   level = "INFO"
+
+[api]
+  dashboard = true
+  insecure = false
 
 [providers]
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     watch = true
     exposedByDefault = false
+
+  [providers.kubernetesIngress]
+    watch = true
+    ingressClass = "traefik"
 
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
@@ -37,15 +45,19 @@
   [tls.options]
     [tls.options.default]
       minVersion = "VersionTLS12"
+      maxVersion = "VersionTLS13"
       cipherSuites = [
         "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384"
       ]
 
 [certificatesResolvers]
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
-      email = "tu-email@dominio.com"
-      storage = "/etc/traefik/letsencrypt/acme.json"
+      email = "{{ letsencrypt_email }}"
+      storage = "/etc/traefik/acme.json"
+      caServer = "https://acme-v02.api.letsencrypt.org/directory"
       [certificatesResolvers.default.acme.httpChallenge]
         entryPoint = "web"
