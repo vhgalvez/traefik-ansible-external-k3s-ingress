@@ -1,5 +1,4 @@
-# Configuración de Traefik
-
+# Configuración de los EntryPoints
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -16,31 +15,34 @@
   [entryPoints.k8sApi]
     address = ":6443"
 
+# Configuración de logs
 [log]
   level = "INFO"
 
+# Habilitar API y Dashboard de Traefik
 [api]
   dashboard = true
   insecure = false
 
+# Configuración de los proveedores de Traefik
 [providers]
   # Proveedor Docker
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
-  # Proveedor KubernetesCRD
+  # Proveedor Kubernetes CRD
   [providers.kubernetesCRD]
     endpoint = "https://10.17.4.21:6443"
     tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     certAuthFilePath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     namespaces = ["default", "traefik"]
 
-  # Proveedor de configuración estática
+  # Proveedor de archivos (Configuración dinámica)
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
-    watch = true
 
+# Configuración de certificados TLS
 [tls]
   [tls.stores]
     [tls.stores.default]
@@ -59,6 +61,7 @@
         "TLS_AES_256_GCM_SHA384"
       ]
 
+# Configuración de CertManager con Let's Encrypt
 [certificatesResolvers]
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
