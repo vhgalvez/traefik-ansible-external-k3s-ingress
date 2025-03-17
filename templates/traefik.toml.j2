@@ -28,7 +28,7 @@
 
   [providers.kubernetesCRD]
     endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "{{ k3s_token.stdout }}"
+    token = "{{ lookup('file', '/etc/traefik/k3s_token') }}"
     certAuthFilePath = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
 
