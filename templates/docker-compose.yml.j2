@@ -1,35 +1,28 @@
 version: "3.9"
 
 services:
-  reverse-proxy:
-    image: "traefik:v3.2"
+  traefik:
+    image: "{{ traefik_docker_image }}"
+    container_name: traefik
     command:
-      - --log.level=info
-      - --api.dashboard=true
-      - --providers.docker=true
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.default.acme.email=victory@cefaslocalserver.com
-      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
-      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.http.tls=true
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.file.filename=/etc/traefik/dynamic_conf.toml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.default.acme.email={{ letsencrypt_email }}"
+      - "--certificatesresolvers.default.acme.storage=/etc/traefik/acme.json"
+      - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
 
     ports:
-      - "80:80"      # HTTP port
-      - "443:443"    # HTTPS port
-      - "8080:8080"  # Web UI (Dashboard)
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik:/etc/traefik
-
-  whoami:
-    image: containous/whoami
-    labels:
-      - "traefik.http.routers.whoami.rule=Host(`whoami.cefaslocalserver.com`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.cefaslocalserver.com`)"
-      - "traefik.http.routers.whoami-secure.entrypoints=websecure"
-      - "traefik.http.routers.whoami-secure.tls=true"
+      - /etc/traefik/traefik.toml:/traefik.toml
+      - /etc/traefik/dynamic_conf.toml:/dynamic_conf.toml
+      - /etc/traefik/acme.json:/acme.json
+      - /etc/traefik/ssl:/etc/traefik/ssl
+    restart: always
