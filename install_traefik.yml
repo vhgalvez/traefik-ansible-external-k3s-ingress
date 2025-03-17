@@ -18,7 +18,7 @@
     docker_compose_version: "2.27.0"
 
   tasks:
-    - name: Instalar `firewalld` en los balanceadores de carga
+    - name: Instalar firewalld en los balanceadores de carga
       ansible.builtin.yum:
         name: firewalld
         state: present
@@ -40,7 +40,7 @@
         - cefaslocalserver.com.crt
         - cefaslocalserver.com.key
 
-    - name: Verificar si K3s está corriendo antes de instalar Traefik (sin Python)
+    - name: Verificar si K3s está corriendo antes de instalar Traefik
       ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_status

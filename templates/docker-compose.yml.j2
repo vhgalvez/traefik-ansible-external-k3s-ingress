@@ -8,7 +8,7 @@ services:
     command:
       - --api.dashboard=true
       - --providers.docker=true
-      - --providers.kubernetesingress=true
+      - --providers.kubernetescrd=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.k8sApi.address=:6443
@@ -17,12 +17,19 @@ services:
       - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.http.tls=true
+      - --entrypoints.websecure.http.tls.certresolver=default
+      - --log.level=INFO
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
-      - "6443:6443"  # Kubernetes API
+      - "6443:6443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "{{ traefik_config_dir }}:/etc/traefik"
+    networks:
+      - traefik_network
+
+networks:
+  traefik_network:
+    driver: bridge
