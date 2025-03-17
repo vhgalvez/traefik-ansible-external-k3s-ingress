@@ -61,8 +61,8 @@
         dest: "/etc/traefik/ssl/{{ item }}"
         mode: '0600'
       loop:
-        - cefaslocalserver.com.crt
-        - cefaslocalserver.com.key
+        - wildcard.cefaslocalserver.com.crt
+        - wildcard.cefaslocalserver.com.key
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
@@ -80,9 +80,14 @@
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
 
+    - name: Copiar configuración dinámica de Traefik
+      ansible.builtin.template:
+        src: templates/dynamic_conf.toml.j2
+        dest: "{{ traefik_config_dir }}/dynamic_conf.toml"
+
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.shell:
-        cmd: docker-compose up -d
+        cmd: docker compose up -d
         chdir: "{{ traefik_config_dir }}"
 
     - name: Configurar firewall
