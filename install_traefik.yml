@@ -21,18 +21,22 @@
     - name: Obtener el token de K3s desde el master sin Python
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
-      register: k3s_token
+      register: k3s_token_raw
       changed_when: false
+
+    - name: Convertir token de K3s a variable usable
+      ansible.builtin.set_fact:
+        k3s_token: "{{ k3s_token_raw.stdout_lines[0] | trim }}"
 
     - name: Obtener el certificado del API de K3s desde el master
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
       delegate_to: "{{ k3s_master_ip }}"
-      register: k3s_ca_cert
+      register: k3s_ca_cert_raw
       changed_when: false
 
-    - name: Definir variable con el token de K3s
+    - name: Convertir certificado de K3s a variable usable
       ansible.builtin.set_fact:
-        k3s_token: "{{ k3s_token.stdout }}"
+        k3s_ca_cert: "{{ k3s_ca_cert_raw.stdout }}"
 
     - name: Asegurar que el directorio de Traefik existe
       ansible.builtin.file:
@@ -42,13 +46,13 @@
 
     - name: Copiar el token de K3s a los balanceadores
       ansible.builtin.copy:
-        content: "{{ k3s_token.stdout }}"
+        content: "{{ k3s_token }}"
         dest: "{{ traefik_config_dir }}/k3s_token"
         mode: "0600"
 
     - name: Copiar el certificado de K3s a los balanceadores
       ansible.builtin.copy:
-        content: "{{ k3s_ca_cert.stdout }}"
+        content: "{{ k3s_ca_cert }}"
         dest: "{{ traefik_config_dir }}/k8s-ca.crt"
         mode: "0600"
 
