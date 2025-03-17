@@ -28,19 +28,20 @@
 
   [providers.kubernetesCRD]
     endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "{{ k3s_token }}"
-    certAuthFilePath = "/etc/traefik/k8s-ca.crt"
+    bearerToken = "{{ lookup('file', '/etc/traefik/k3s_token') }}"
+    certificateAuthority = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
 
   [providers.file]
     filename = "/etc/traefik/dynamic_conf.toml"
+    watch = true
 
 [tls]
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
-        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
+        certFile = "/etc/traefik/certs/wildcard.{{ traefik_domain }}.crt"
+        keyFile = "/etc/traefik/certs/wildcard.{{ traefik_domain }}.key"
 
   [tls.options]
     [tls.options.default]

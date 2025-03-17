@@ -9,11 +9,6 @@
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "cefaslocalserver.com"
-    firewall_ports:
-      - 80/tcp
-      - 443/tcp
-      - 8080/tcp
-      - 6443/tcp
     k3s_master_ip: "10.17.4.21"
     docker_compose_version: "2.27.0"
 
@@ -26,7 +21,7 @@
 
     - name: Convertir token de K3s a variable usable
       ansible.builtin.set_fact:
-        k3s_token: "{{ k3s_token_raw.stdout_lines[0] | trim }}"
+        k3s_token: "{{ k3s_token_raw.stdout | trim }}"
 
     - name: Obtener el certificado del API de K3s desde el master
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
