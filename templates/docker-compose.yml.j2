@@ -17,8 +17,7 @@ services:
       - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.http.tls.certresolver=default
-      - --log.level=INFO
+      - --entrypoints.websecure.http.tls=true
     ports:
       - "80:80"
       - "443:443"
@@ -27,9 +26,3 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "{{ traefik_config_dir }}:/etc/traefik"
-    networks:
-      - traefik_network
-
-networks:
-  traefik_network:
-    driver: bridge
