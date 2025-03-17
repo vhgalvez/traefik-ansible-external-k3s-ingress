@@ -9,137 +9,57 @@
     traefik_docker_image: "traefik:v3.2"
     letsencrypt_email: "tu-email@dominio.com"
     traefik_domain: "cefaslocalserver.com"
+    k3s_master_ip: "10.17.4.21"
+    docker_compose_version: "2.27.0"
     firewall_ports:
       - 80/tcp
       - 443/tcp
       - 8080/tcp
       - 6443/tcp
-    k3s_master_ip: "10.17.4.21"
-    docker_compose_version: "2.27.0"
 
   tasks:
-    - name: Verificar si K3s está corriendo antes de instalar Traefik
-      ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
-      delegate_to: "{{ k3s_master_ip }}"
-      register: k3s_status
-      ignore_errors: true
-
-    - name: Fallar si K3s no está en ejecución
-      ansible.builtin.fail:
-        msg: "K3s no está corriendo en el nodo maestro, verifica la instalación antes de instalar Traefik."
-      when: "'not running' in k3s_status.stdout"
-
-    - name: Obtener el token de K3s desde el master
-      ansible.builtin.command: "cat /var/lib/rancher/k3s/server/node-token"
-      become: true  # Necesario para leer el archivo con permisos root
+    - name: Obtener el token de K3s desde el master sin Python
+      ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_token
-
-    - name: Copiar el token de K3s a los balanceadores de carga
-      ansible.builtin.copy:
-        content: "{{ k3s_token.stdout }}"
-        dest: "/etc/traefik/k3s_token"
-        mode: "0600"
+      changed_when: false
 
     - name: Obtener el certificado del API de K3s desde el master
-      ansible.builtin.command: "cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
-      become: true  # Necesario para leer el archivo con permisos root
+      ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_ca_cert
-
-    - name: Copiar el certificado en los balanceadores de carga
-      ansible.builtin.copy:
-        content: "{{ k3s_ca_cert.stdout }}"
-        dest: "/etc/traefik/k8s-ca.crt"
-        mode: "0600"
-
-    - name: Instalar firewalld en los balanceadores de carga
-      ansible.builtin.yum:
-        name: firewalld
-        state: present
-      when: ansible_os_family == "RedHat"
-
-    - name: Habilitar e iniciar firewalld
-      ansible.builtin.systemd:
-        name: firewalld
-        state: started
-        enabled: true
-      when: ansible_os_family == "RedHat"
-
-    - name: Copiar certificados SSL a los balanceadores de carga
-      ansible.builtin.copy:
-        src: "files/ssl/{{ item }}"
-        dest: "/etc/traefik/ssl/{{ item }}"
-        mode: '0600'
-      loop:
-        - cefaslocalserver.com.crt
-        - cefaslocalserver.com.key
-
-    - name: Instalar paquetes necesarios
-      ansible.builtin.yum:
-        name:
-          - epel-release
-          - yum-utils
-          - net-tools
-          - vim
-          - curl
-          - wget
-        state: present
-
-    - name: Agregar el repositorio de Docker
-      ansible.builtin.shell: |
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-
-    - name: Instalar Docker
-      ansible.builtin.yum:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-        state: present
-
-    - name: Iniciar y habilitar Docker
-      ansible.builtin.systemd:
-        name: docker
-        state: started
-        enabled: true
-
-    - name: Descargar e instalar Docker Compose
-      ansible.builtin.get_url:
-        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
-        dest: "/usr/local/bin/docker-compose"
-        mode: '0755'
-
-    - name: Crear enlace simbólico para Docker Compose
-      ansible.builtin.file:
-        src: "/usr/local/bin/docker-compose"
-        dest: "/usr/bin/docker-compose"
-        state: link
+      changed_when: false
 
     - name: Crear directorios para Traefik
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
-        mode: '0755'
+        mode: "0755"
       loop:
         - "{{ traefik_config_dir }}"
         - "{{ traefik_config_dir }}/ssl"
 
-    - name: Crear archivo acme.json
-      ansible.builtin.file:
-        path: "{{ acme_file }}"
-        state: touch
-        mode: '0600'
+    - name: Copiar el token de K3s a los balanceadores
+      ansible.builtin.copy:
+        content: "{{ k3s_token.stdout }}"
+        dest: "/etc/traefik/k3s_token"
+        mode: "0600"
 
-    - name: Copiar configuración de Docker Compose
-      ansible.builtin.template:
-        src: templates/docker-compose.yml.j2
-        dest: "{{ docker_compose_file }}"
+    - name: Copiar el certificado de K3s a los balanceadores
+      ansible.builtin.copy:
+        content: "{{ k3s_ca_cert.stdout }}"
+        dest: "/etc/traefik/k8s-ca.crt"
+        mode: "0600"
 
     - name: Copiar configuración de Traefik
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
+
+    - name: Copiar configuración de Docker Compose
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ docker_compose_file }}"
 
     - name: Iniciar Traefik con Docker Compose
       ansible.builtin.shell:
