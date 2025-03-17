@@ -14,18 +14,19 @@
       - 443/tcp
       - 8080/tcp
       - 6443/tcp
+    k3s_master_ip: "10.17.4.21"
 
   tasks:
-    - name: Verificar si K3s está corriendo antes de instalar Traefik
-      command: "systemctl is-active k3s"
+    - name: Verificar si K3s está corriendo antes de instalar Traefik (sin Python)
+      ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
+      delegate_to: "{{ k3s_master_ip }}"
       register: k3s_status
-      delegate_to: "{{ groups['masters'] | first }}"
       ignore_errors: true
 
     - name: Fallar si K3s no está en ejecución
       fail:
         msg: "K3s no está corriendo en el nodo maestro, verifica la instalación antes de instalar Traefik."
-      when: k3s_status.rc != 0
+      when: "'not running' in k3s_status.stdout"
 
     - name: Instalar paquetes necesarios
       ansible.builtin.yum:
