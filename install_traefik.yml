@@ -1,109 +1,152 @@
 ---
-- name: Configuración de Traefik en los Balanceadores de Carga con K3s
-  hosts: master1  # Ajusta esto para que se ejecute en un solo nodo maestro
+- name: Instalación y configuración de Traefik en los Balanceadores de Carga
+  hosts: loadbalancer
   become: true
   vars:
-    k3s_namespace: "kube-system"
-    traefik_serviceaccount: "traefik-sa"
-    traefik_role: "traefik-role"
-    traefik_rolebinding: "traefik-rolebinding"
+    traefik_config_dir: /etc/traefik
+    docker_compose_file: /etc/traefik/docker-compose.yml
+    acme_file: /etc/traefik/acme.json
+    traefik_docker_image: "traefik:v3.2"
+    letsencrypt_email: "tu-email@dominio.com"
+    traefik_domain: "cefaslocalserver.com"
+    firewall_ports:
+      - 80/tcp
+      - 443/tcp
+      - 8080/tcp
+      - 6443/tcp
     k3s_master_ip: "10.17.4.21"
-    load_balancers:
-      - "10.17.3.12"
-      - "10.17.3.13"
+    docker_compose_version: "2.27.0"
 
   tasks:
-    - name: Crear ServiceAccount para Traefik en K3s
+    - name: Obtener el token de K3s para Traefik desde el master
+      delegate_to: "{{ k3s_master_ip }}"
+      run_once: true
       ansible.builtin.shell: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: v1
-        kind: ServiceAccount
-        metadata:
-          name: {{ traefik_serviceaccount }}
-          namespace: {{ k3s_namespace }}
-        EOF
-      register: sa_created
-      changed_when: "'created' in sa_created.stdout"
+        kubectl get secret $(kubectl get sa traefik-sa -n kube-system -o jsonpath="{.secrets[0].name}") -n kube-system -o jsonpath="{.data.token}" | base64 --decode
+      register: k3s_token
 
-    - name: Crear Role con permisos para Traefik
-      ansible.builtin.shell: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: Role
-        metadata:
-          name: {{ traefik_role }}
-          namespace: {{ k3s_namespace }}
-        rules:
-          - apiGroups: [""]
-            resources: ["services", "endpoints", "pods", "secrets"]
-            verbs: ["get", "list", "watch"]
-          - apiGroups: ["networking.k8s.io"]
-            resources: ["ingresses"]
-            verbs: ["get", "list", "watch"]
-          - apiGroups: ["traefik.io"]
-            resources: ["ingressroutes", "middlewares"]
-            verbs: ["get", "list", "watch"]
-        EOF
-      register: role_created
-      changed_when: "'created' in role_created.stdout"
-
-    - name: Crear RoleBinding para Traefik
-      ansible.builtin.shell: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: RoleBinding
-        metadata:
-          name: {{ traefik_rolebinding }}
-          namespace: {{ k3s_namespace }}
-        subjects:
-          - kind: ServiceAccount
-            name: {{ traefik_serviceaccount }}
-            namespace: {{ k3s_namespace }}
-        roleRef:
-          kind: Role
-          name: {{ traefik_role }}
-          apiGroup: rbac.authorization.k8s.io
-        EOF
-      register: rolebinding_created
-      changed_when: "'created' in rolebinding_created.stdout"
-
-    - name: Obtener el token del ServiceAccount de Traefik
-      ansible.builtin.shell: |
-        kubectl get secret $(kubectl get sa {{ traefik_serviceaccount }} -n {{ k3s_namespace }} -o jsonpath="{.secrets[0].name}") \
-        -n {{ k3s_namespace }} -o jsonpath="{.data.token}" | base64 --decode
-      register: traefik_k3s_token
-      changed_when: false
-
-    - name: Obtener el certificado de autenticación de K3s
-      ansible.builtin.shell: cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      register: k3s_ca_cert
-      changed_when: false
-
-    - name: Copiar token y certificado CA a los balanceadores de carga
-      ansible.builtin.copy:
-        content: "{{ traefik_k3s_token.stdout }}"
-        dest: "/etc/traefik/k3s_token"
+    - name: Crear archivo de configuración dinámico vacío si no existe
+      ansible.builtin.file:
+        path: "/etc/traefik/dynamic_conf.toml"
+        state: touch
         mode: '0600'
-      delegate_to: "{{ item }}"
-      loop: "{{ load_balancers }}"
 
-    - name: Copiar certificado CA a los balanceadores de carga
+    - name: Instalar firewalld en los balanceadores de carga
+      ansible.builtin.yum:
+        name: firewalld
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Habilitar e iniciar firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Copiar certificados SSL a los balanceadores de carga
       ansible.builtin.copy:
-        content: "{{ k3s_ca_cert.stdout }}"
-        dest: "/etc/traefik/k3s_ca.crt"
+        src: "files/ssl/{{ item }}"
+        dest: "/etc/traefik/ssl/{{ item }}"
         mode: '0600'
-      delegate_to: "{{ item }}"
-      loop: "{{ load_balancers }}"
+      loop:
+        - cefaslocalserver.com.crt
+        - cefaslocalserver.com.key
 
-    - name: Modificar configuración de Traefik en los balanceadores de carga
+    - name: Verificar si K3s está corriendo antes de instalar Traefik
+      ansible.builtin.raw: "systemctl is-active k3s || echo 'not running'"
+      delegate_to: "{{ k3s_master_ip }}"
+      register: k3s_status
+      ignore_errors: true
+
+    - name: Fallar si K3s no está en ejecución
+      ansible.builtin.fail:
+        msg: "K3s no está corriendo en el nodo maestro, verifica la instalación antes de instalar Traefik."
+      when: "'not running' in k3s_status.stdout"
+
+    - name: Instalar paquetes necesarios
+      ansible.builtin.yum:
+        name:
+          - epel-release
+          - yum-utils
+          - net-tools
+          - vim
+          - curl
+          - wget
+        state: present
+
+    - name: Agregar el repositorio de Docker
+      ansible.builtin.shell: |
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Instalar Docker
+      ansible.builtin.yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Iniciar y habilitar Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Descargar e instalar Docker Compose
+      ansible.builtin.get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: "/usr/local/bin/docker-compose"
+        mode: '0755'
+
+    - name: Crear enlace simbólico para Docker Compose
+      ansible.builtin.file:
+        src: "/usr/local/bin/docker-compose"
+        dest: "/usr/bin/docker-compose"
+        state: link
+
+    - name: Crear directorios para Traefik
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/ssl"
+
+    - name: Crear archivo acme.json
+      ansible.builtin.file:
+        path: "{{ acme_file }}"
+        state: touch
+        mode: '0600'
+
+    - name: Copiar configuración de Docker Compose
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ docker_compose_file }}"
+
+    - name: Copiar configuración de Traefik
       ansible.builtin.template:
         src: templates/traefik.toml.j2
-        dest: "/etc/traefik/traefik.toml"
-      delegate_to: "{{ item }}"
-      loop: "{{ load_balancers }}"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+      vars:
+        k3s_token_value: "{{ k3s_token.stdout }}"
 
-    - name: Reiniciar Traefik en los balanceadores de carga
+    - name: Iniciar Traefik con Docker Compose
       ansible.builtin.shell:
-        cmd: docker restart traefik
-      delegate_to: "{{ item }}"
-      loop: "{{ load_balancers }}"
+        cmd: docker-compose up -d
+        chdir: "{{ traefik_config_dir }}"
+
+    - name: Configurar firewall (abrir puertos necesarios)
+      ansible.builtin.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop: "{{ firewall_ports }}"
+      notify: Reload firewall
+
+  handlers:
+    - name: Reload firewall
+      ansible.builtin.systemd:
+        name: firewalld
+        state: reloaded
