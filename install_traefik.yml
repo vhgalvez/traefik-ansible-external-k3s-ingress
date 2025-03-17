@@ -132,6 +132,6 @@
 
   handlers:
     - name: Reload firewall
-      ansible.builtin.service:
+      ansible.builtin.systemd:
         name: firewalld
         state: reloaded
