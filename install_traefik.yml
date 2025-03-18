@@ -26,16 +26,19 @@
       register: kubeconfig_check
 
     - name: Copiar kubeconfig desde el master si no existe
-      command: >
-        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null 
-        root@{{ k3s_master_ip }}:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_path }}
+      ansible.builtin.fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ kubeconfig_path }}"
+        flat: yes
       when: not kubeconfig_check.stat.exists
       become: true
-      register: scp_output
+      delegate_to: "{{ k3s_master_ip }}"
+      register: fetch_result
 
-    - name: Mostrar salida de la transferencia
+    - name: Mostrar barra de progreso durante la transferencia
       debug:
-        msg: "{{ scp_output.stdout }}"
+        msg: "Copiando kubeconfig desde el master..."
+      when: fetch_result is defined and fetch_result.changed
 
     - name: Asegurar que el directorio de Traefik exista
       file:
