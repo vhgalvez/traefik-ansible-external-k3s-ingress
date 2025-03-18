@@ -36,7 +36,7 @@
         organization_name: "MyOrg"
 
     - name: Generar certificado autofirmado
-      community.crypto.openssl_certificate:
+      community.crypto.x509_certificate:
         path: "{{ certs_dir }}/traefik.crt"
         privatekey_path: "{{ certs_dir }}/traefik.key"
         csr_path: "{{ certs_dir }}/traefik.csr"
