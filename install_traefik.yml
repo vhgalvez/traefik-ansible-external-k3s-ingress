@@ -1,8 +1,16 @@
 ---
-- name: Instalar PyPy en nodos Flatcar
+- name: Instalar PyPy y configurar Traefik en los Balanceadores de Carga
   hosts: loadbalancer
   become: true
+  vars:
+    traefik_config_dir: "/etc/traefik"
+    traefik_domain: "traefik.local"
+    letsencrypt_email: "tu-email@dominio.com"
+    k3s_master_ip: "10.17.4.21"
+    kubeconfig_path: "/root/.kube/config"
+
   tasks:
+    # Instalar PyPy en nodos Flatcar
     - name: Descargar archivo tar de PyPy
       raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
 
@@ -15,18 +23,7 @@
     - name: Crear enlace simbólico para python
       raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
 
----
-- name: Instalación y configuración de Traefik en los Balanceadores de Carga
-  hosts: loadbalancer
-  become: true
-  vars:
-    traefik_config_dir: "/etc/traefik"
-    traefik_domain: "traefik.local"
-    letsencrypt_email: "tu-email@dominio.com"
-    k3s_master_ip: "10.17.4.21"
-    kubeconfig_path: "/root/.kube/config"
-
-  tasks:
+    # Instalación y configuración de Traefik en los Balanceadores de Carga
     - name: Instalar dependencias necesarias en los balanceadores
       package:
         name:
