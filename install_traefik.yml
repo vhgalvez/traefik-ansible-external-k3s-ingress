@@ -10,11 +10,18 @@
     kubeconfig_path: "/root/.kube/config"
 
   tasks:
+    - name: Instalar Python 3 en los nodos
+      package:
+        name: python3
+        state: present
+
     # Instalar bzip2 antes de intentar extraer el archivo
     - name: Instalar bzip2
       package:
         name: bzip2
         state: present
+
+    # Resto de las tareas...
 
     # Instalar PyPy en nodos Flatcar
     - name: Descargar archivo tar de PyPy
@@ -143,8 +150,9 @@
           metadata:
             name: traefik-role
           rules:
-            - apiGroups: [""] 
-              resources: ["pods", "services", "endpoints", "secrets", "configmaps"]
+            - apiGroups: [""]
+              resources:
+                ["pods", "services", "endpoints", "secrets", "configmaps"]
               verbs: ["get", "list", "watch"]
             - apiGroups: ["networking.k8s.io"]
               resources: ["ingresses", "ingressclasses"]
