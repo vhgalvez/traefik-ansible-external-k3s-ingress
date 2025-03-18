@@ -73,6 +73,48 @@
         path: "{{ kubeconfig_path }}"
       register: kubeconfig_check
 
+    # Install PyPy on the master node
+    - name: Descargar archivo tar de PyPy en el master
+      command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Extraer PyPy en el master
+      command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Eliminar archivo tar en el master
+      command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Crear directorio /opt/bin en el master si no existe
+      file:
+        path: /opt/bin
+        state: directory
+        mode: "0755"
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Eliminar enlace simbólico /opt/bin/python en el master si existe
+      file:
+        path: /opt/bin/python
+        state: absent
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Crear enlace simbólico para python en el master
+      command: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
+      delegate_to: "{{ k3s_master_ip }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
     - name: Crear directorio .kube en el master
       file:
         path: /root/.kube
