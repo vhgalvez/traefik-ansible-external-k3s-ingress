@@ -10,18 +10,23 @@
     kubeconfig_path: "/root/.kube/config"
 
   tasks:
-    - name: Instalar Python 3 en los nodos
+    # Verificar si Python 3 está instalado, de lo contrario, instalarlo
+    - name: Verificar si Python 3 está instalado
+      stat:
+        path: /usr/bin/python3
+      register: python3_installed
+
+    - name: Instalar Python 3 si no está instalado
       package:
         name: python3
         state: present
+      when: not python3_installed.stat.exists
 
     # Instalar bzip2 antes de intentar extraer el archivo
     - name: Instalar bzip2
       package:
         name: bzip2
         state: present
-
-    # Resto de las tareas...
 
     # Instalar PyPy en nodos Flatcar
     - name: Descargar archivo tar de PyPy
