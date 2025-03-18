@@ -10,6 +10,16 @@
     kubeconfig_path: "/root/.kube/config"
 
   tasks:
+    - name: Instalar dependencias necesarias en los balanceadores
+      package:
+        name:
+          - python3
+          - python3-pip
+          - python3-cryptography
+          - openssh-clients
+          - ca-certificates
+        state: present
+
     - name: Verificar si kubeconfig existe
       stat:
         path: "{{ kubeconfig_path }}"
