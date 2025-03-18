@@ -11,18 +11,6 @@
     k3s_master_python_interpreter: "/opt/bin/python"
 
   tasks:
-    # Verificar si Python 3 está instalado, de lo contrario, instalarlo
-    - name: Verificar si Python 3 está instalado
-      stat:
-        path: /usr/bin/python3
-      register: python3_installed
-
-    - name: Instalar Python 3 si no está instalado
-      package:
-        name: python3
-        state: present
-      when: not python3_installed.stat.exists
-
     # Instalar bzip2 antes de intentar extraer el archivo
     - name: Instalar bzip2
       package:
@@ -32,15 +20,15 @@
     # Descargar y extraer PyPy solo si no está ya instalado
     - name: Descargar archivo tar de PyPy
       command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not python3_installed.stat.exists
+      when: not pypy_installed.stat.exists
 
     - name: Extraer PyPy
       command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: not python3_installed.stat.exists
+      when: not pypy_installed.stat.exists
 
     - name: Eliminar archivo tar
       command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not python3_installed.stat.exists
+      when: not pypy_installed.stat.exists
 
     # Asegurar que /opt/bin/ exista antes de crear el enlace simbólico
     - name: Crear directorio /opt/bin si no existe
