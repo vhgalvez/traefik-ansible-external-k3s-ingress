@@ -10,12 +10,18 @@
     kubeconfig_path: "/root/.kube/config"
 
   tasks:
+    # Instalar bzip2 antes de intentar extraer el archivo
+    - name: Instalar bzip2
+      package:
+        name: bzip2
+        state: present
+
     # Instalar PyPy en nodos Flatcar
     - name: Descargar archivo tar de PyPy
       raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
 
     - name: Extraer PyPy
-      raw: tar -xf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
+      raw: tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
 
     - name: Eliminar archivo tar
       raw: rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2
