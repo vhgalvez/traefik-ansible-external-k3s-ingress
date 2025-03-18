@@ -7,7 +7,13 @@
     cert_common_name: "traefik.local"
 
   tasks:
-    - name: Asegurar que el directorio de certificados existe
+    - name: Asegurar que la biblioteca cryptography esté instalada
+      pip:
+        name: cryptography
+        state: present
+        executable: pip3
+
+    - name: Asegurar que el directorio de certificados exista
       ansible.builtin.file:
         path: "{{ certs_dir }}"
         state: directory
