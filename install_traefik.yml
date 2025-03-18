@@ -8,7 +8,6 @@
     letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
     kubeconfig_path: "/root/.kube/config"
-  ansible_python_interpreter: /opt/pypy3.9-v7.3.9-linux64/bin/pypy3   # Añadir esta línea
 
   tasks:
     # Instalar bzip2 antes de intentar extraer el archivo
