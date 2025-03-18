@@ -1,7 +1,7 @@
 - name: Instalar PyPy en nodos Flatcar Linux
   hosts: all
   become: true
-  gather_facts: no
+  gather_facts: no  # Deshabilitar la recopilación de hechos
   tasks:
     - name: Verificar si PyPy está instalado
       shell: "test -f /opt/bin/python && echo 'installed' || echo 'not installed'"
