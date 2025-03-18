@@ -29,17 +29,18 @@
         name: bzip2
         state: present
 
-    # Resto de las tareas...
-
-    # Instalar PyPy en nodos Flatcar
+    # Descargar y extraer PyPy solo si no está ya instalado
     - name: Descargar archivo tar de PyPy
       command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: not python3_installed.stat.exists
 
-    - name: Extraer PyPy (con tar -xjf para descomprimir .bz2)
+    - name: Extraer PyPy
       command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      when: not python3_installed.stat.exists
 
     - name: Eliminar archivo tar
       command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: not python3_installed.stat.exists
 
     # Asegurar que /opt/bin/ exista antes de crear el enlace simbólico
     - name: Crear directorio /opt/bin si no existe
@@ -73,60 +74,8 @@
         path: "{{ kubeconfig_path }}"
       register: kubeconfig_check
 
-    # Install PyPy on the master node
-    - name: Descargar archivo tar de PyPy en el master
-      command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Extraer PyPy en el master
-      command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Eliminar archivo tar en el master
-      command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Crear directorio /opt/bin en el master si no existe
-      file:
-        path: /opt/bin
-        state: directory
-        mode: "0755"
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Eliminar enlace simbólico /opt/bin/python en el master si existe
-      file:
-        path: /opt/bin/python
-        state: absent
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Crear enlace simbólico para python en el master
-      command: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
-      delegate_to: "{{ k3s_master_ip }}"
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Crear directorio .kube en el master
-      file:
-        path: /root/.kube
-        state: directory
-        mode: '0700'
-      delegate_to: "{{ k3s_master_ip }}"
-      when: not kubeconfig_check.stat.exists
-      vars:
-        ansible_python_interpreter: "{{ k3s_master_python_interpreter }}"
-
     - name: Copiar kubeconfig desde el master si no existe
-      fetch:
+      ansible.builtin.fetch:
         src: /etc/rancher/k3s/k3s.yaml
         dest: "{{ kubeconfig_path }}"
         flat: yes
@@ -134,14 +83,6 @@
       become: true
       delegate_to: "{{ k3s_master_ip }}"
       register: fetch_result
-      vars:
-        ansible_python_interpreter: "{{ k3s_master_python_interpreter }}"
-      ignore_errors: yes
-
-    - name: Verificar si la copia falló
-      fail:
-        msg: "No se pudo copiar el archivo kubeconfig desde el master"
-      when: fetch_result is failed
 
     - name: Mostrar barra de progreso durante la transferencia
       debug:
@@ -218,9 +159,8 @@
           metadata:
             name: traefik-role
           rules:
-            - apiGroups: [""]
-              resources:
-                ["pods", "services", "endpoints", "secrets", "configmaps"]
+            - apiGroups: [""] 
+              resources: ["pods", "services", "endpoints", "secrets", "configmaps"]
               verbs: ["get", "list", "watch"]
             - apiGroups: ["networking.k8s.io"]
               resources: ["ingresses", "ingressclasses"]
