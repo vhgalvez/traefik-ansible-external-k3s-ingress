@@ -1,4 +1,21 @@
 ---
+- name: Instalar PyPy en nodos Flatcar
+  hosts: loadbalancer
+  become: true
+  tasks:
+    - name: Descargar archivo tar de PyPy
+      raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
+
+    - name: Extraer PyPy
+      raw: tar -xf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
+
+    - name: Eliminar archivo tar
+      raw: rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2
+
+    - name: Crear enlace simbólico para python
+      raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
+
+---
 - name: Instalación y configuración de Traefik en los Balanceadores de Carga
   hosts: loadbalancer
   become: true
@@ -110,7 +127,7 @@
           metadata:
             name: traefik-role
           rules:
-            - apiGroups: [""]
+            - apiGroups: [""] 
               resources: ["pods", "services", "endpoints", "secrets", "configmaps"]
               verbs: ["get", "list", "watch"]
             - apiGroups: ["networking.k8s.io"]
