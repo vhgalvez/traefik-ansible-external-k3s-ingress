@@ -20,7 +20,7 @@
       when: not kubeconfig_check.stat.exists
       become: true
 
-    - name: Asegurar que el directorio de Traefik existe
+    - name: Asegurar que el directorio de Traefik exista
       file:
         path: "{{ traefik_config_dir }}"
         state: directory
@@ -37,6 +37,7 @@
         src: "{{ kubeconfig_path }}"
         dest: "{{ traefik_config_dir }}/kubeconfig"
         mode: "0600"
+      when: kubeconfig_check.stat.exists
 
     - name: Obtener el token de K3s desde el master
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
@@ -122,3 +123,4 @@
       shell: "docker restart traefik || docker-compose up -d"
       args:
         chdir: "{{ traefik_config_dir }}"
+      become: true
