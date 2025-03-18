@@ -1,31 +1,30 @@
----
 - name: Instalar PyPy en nodos Flatcar Linux
   hosts: all
   become: true
+  gather_facts: no
   tasks:
     - name: Verificar si PyPy está instalado
-      stat:
-        path: /opt/bin/python
+      shell: "test -f /opt/bin/python && echo 'installed' || echo 'not installed'"
       register: pypy_installed
 
     - name: Descargar archivo tar de PyPy
-      command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not pypy_installed.stat.exists
+      shell: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: pypy_installed.stdout == "not installed"
 
     - name: Extraer PyPy
-      command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: not pypy_installed.stat.exists
+      shell: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      when: pypy_installed.stdout == "not installed"
 
     - name: Eliminar archivo tar
-      command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not pypy_installed.stat.exists
+      shell: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: pypy_installed.stdout == "not installed"
 
     - name: Crear enlace simbólico para PyPy
-      command: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
-      when: not pypy_installed.stat.exists
+      shell: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
+      when: pypy_installed.stdout == "not installed"
 
     - name: Verificar instalación de PyPy
-      command: "/opt/bin/python --version"
+      shell: "/opt/bin/python --version"
       register: pypy_version
 
     - name: Mostrar versión de PyPy
