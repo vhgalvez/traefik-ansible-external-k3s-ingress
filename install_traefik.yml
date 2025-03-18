@@ -14,6 +14,7 @@
 
     - name: Crear enlace simbólico para python
       raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
+
 ---
 - name: Instalación y configuración de Traefik en los Balanceadores de Carga
   hosts: loadbalancer
