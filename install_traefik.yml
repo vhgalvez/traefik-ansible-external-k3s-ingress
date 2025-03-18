@@ -28,15 +28,17 @@
         name: bzip2
         state: present
 
+    # Resto de las tareas...
+
     # Instalar PyPy en nodos Flatcar
     - name: Descargar archivo tar de PyPy
-      raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
+      command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
 
     - name: Extraer PyPy (con tar -xjf para descomprimir .bz2)
-      raw: tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
+      command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
 
     - name: Eliminar archivo tar
-      raw: rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2
+      command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
 
     # Asegurar que /opt/bin/ exista antes de crear el enlace simbólico
     - name: Crear directorio /opt/bin si no existe
@@ -52,7 +54,7 @@
         state: absent
 
     - name: Crear enlace simbólico para python
-      raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
+      command: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
 
     # Instalación y configuración de Traefik en los Balanceadores de Carga
     - name: Instalar dependencias necesarias en los balanceadores
