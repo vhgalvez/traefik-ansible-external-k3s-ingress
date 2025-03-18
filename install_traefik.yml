@@ -20,7 +20,7 @@
     - name: Descargar archivo tar de PyPy
       raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
 
-    - name: Extraer PyPy
+    - name: Extraer PyPy (con tar -xjf para descomprimir .bz2)
       raw: tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
 
     - name: Eliminar archivo tar
