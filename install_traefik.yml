@@ -9,36 +9,25 @@
     k3s_master_ip: "10.17.4.21"
 
   tasks:
-    - name: Obtener todas las redes Docker existentes
-      docker_network:
-        name: "{{ item }}"
-        state: absent
-      loop: "{{ lookup('docker_networks') | selectattr('Name', 'ne', 'bridge') | map(attribute='Name') | list }}"
-      when: lookup('docker_networks') is not none
-
     - name: Obtener el token de K3s desde el master sin Python
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_token_raw
       changed_when: false
-      when: k3s_token_raw is not defined
 
     - name: Convertir token de K3s a variable usable
       ansible.builtin.set_fact:
         k3s_token: "{{ k3s_token_raw.stdout | trim }}"
-      when: k3s_token_raw is not defined
 
     - name: Obtener el certificado del API de K3s desde el master
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_ca_cert_raw
       changed_when: false
-      when: k3s_ca_cert_raw is not defined
 
     - name: Convertir certificado de K3s a variable usable
       ansible.builtin.set_fact:
         k3s_ca_cert: "{{ k3s_ca_cert_raw.stdout }}"
-      when: k3s_ca_cert_raw is not defined
 
     - name: Asegurar que el directorio de Traefik exista
       ansible.builtin.file:
@@ -57,14 +46,12 @@
         content: "{{ k3s_token }}"
         dest: "{{ traefik_config_dir }}/k3s_token"
         mode: "0600"
-      when: not k3s_token_check.stat.exists
 
     - name: Copiar el certificado de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_ca_cert }}"
         dest: "{{ traefik_config_dir }}/k8s-ca.crt"
         mode: "0600"
-      when: not k3s_cert_check.stat.exists
 
     - name: Crear `dynamic_conf.toml` si no existe
       ansible.builtin.file:
