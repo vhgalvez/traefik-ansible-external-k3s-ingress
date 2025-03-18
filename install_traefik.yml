@@ -26,9 +26,16 @@
       register: kubeconfig_check
 
     - name: Copiar kubeconfig desde el master si no existe
-      command: "scp root@{{ k3s_master_ip }}:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_path }}"
+      command: >
+        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null 
+        root@{{ k3s_master_ip }}:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_path }}
       when: not kubeconfig_check.stat.exists
       become: true
+      register: scp_output
+
+    - name: Mostrar salida de la transferencia
+      debug:
+        msg: "{{ scp_output.stdout }}"
 
     - name: Asegurar que el directorio de Traefik exista
       file:
