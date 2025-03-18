@@ -1,63 +1,52 @@
-[entryPoints]
-  [entryPoints.web]
-    address = ":80"
-    [entryPoints.web.http.redirections.entrypoint]
-      to = "websecure"
-      scheme = "https"
-      permanent = true
+---
+- name: Generar certificados SSL para Traefik
+  hosts: loadbalancer
+  become: true
+  vars:
+    certs_dir: "/etc/traefik/certs"
+    cert_common_name: "traefik.local"
 
-  [entryPoints.websecure]
-    address = ":443"
-    [entryPoints.websecure.http.tls]
-      certResolver = "default"
+  tasks:
+    - name: Asegurar que el directorio de certificados existe
+      ansible.builtin.file:
+        path: "{{ certs_dir }}"
+        state: directory
+        mode: "0755"
 
-  [entryPoints.k8sApi]
-    address = ":6443"
+    - name: Eliminar certificados previos si existen
+      ansible.builtin.file:
+        path: "{{ certs_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - traefik.key
+        - traefik.csr
+        - traefik.crt
 
-[log]
-  level = "INFO"
+    - name: Generar clave privada
+      community.crypto.openssl_privatekey:
+        path: "{{ certs_dir }}/traefik.key"
+        size: 2048
+        mode: "0600"
 
-[api]
-  dashboard = true
-  insecure = false
+    - name: Generar solicitud de certificado (CSR)
+      community.crypto.openssl_csr:
+        path: "{{ certs_dir }}/traefik.csr"
+        privatekey_path: "{{ certs_dir }}/traefik.key"
+        common_name: "{{ cert_common_name }}"
+        organization_name: "MyOrg"
 
-[providers]
-  [providers.docker]
-    endpoint = "unix:///var/run/docker.sock"
-    exposedByDefault = false
+    - name: Generar certificado autofirmado
+      community.crypto.openssl_certificate:
+        path: "{{ certs_dir }}/traefik.crt"
+        privatekey_path: "{{ certs_dir }}/traefik.key"
+        csr_path: "{{ certs_dir }}/traefik.csr"
+        provider: selfsigned
 
-  [providers.kubernetesCRD]
-    endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "{{ lookup('file', '/etc/traefik/k3s_token') }}"
-    certAuthFilePath = "/etc/traefik/k8s-ca.crt"
-    namespaces = ["default", "traefik"]
+    - name: Mostrar detalles del certificado generado
+      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/traefik.crt -noout -text"
+      register: cert_info
+      changed_when: false
 
-  [providers.file]
-    filename = "/etc/traefik/dynamic_conf.toml"
-
-[tls]
-  [tls.stores]
-    [tls.stores.default]
-      [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.crt"
-        keyFile = "/etc/traefik/certs/wildcard.cefaslocalserver.com.key"
-
-  [tls.options]
-    [tls.options.default]
-      minVersion = "VersionTLS12"
-      maxVersion = "VersionTLS13"
-      cipherSuites = [
-        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-        "TLS_AES_128_GCM_SHA256",
-        "TLS_AES_256_GCM_SHA384"
-      ]
-
-[certificatesResolvers]
-  [certificatesResolvers.default]
-    [certificatesResolvers.default.acme]
-      email = "{{ letsencrypt_email }}"
-      storage = "/etc/traefik/acme.json"
-      caServer = "https://acme-v02.api.letsencrypt.org/directory"
-      [certificatesResolvers.default.acme.httpChallenge]
-        entryPoint = "web"
+    - name: Imprimir detalles del certificado
+      ansible.builtin.debug:
+        msg: "{{ cert_info.stdout }}"
