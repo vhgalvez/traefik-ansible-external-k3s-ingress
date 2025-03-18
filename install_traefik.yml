@@ -9,6 +9,12 @@
     k3s_master_ip: "10.17.4.21"
 
   tasks:
+    - name: Obtener todas las redes Docker existentes
+      docker_network:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ lookup('docker_networks') | selectattr('Name', 'ne', 'bridge') | map(attribute='Name') | list }}"
+
     - name: Obtener el token de K3s desde el master sin Python
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
