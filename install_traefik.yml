@@ -7,8 +7,54 @@
     traefik_domain: "cefaslocalserver.com"
     letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
+    kubeconfig_path: "/root/.kube/config"
 
   tasks:
+    - name: Verificar si kubeconfig existe
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_check
+
+    - name: Copiar kubeconfig desde el master si no existe
+      when: not kubeconfig_check.stat.exists
+      command: >
+        scp root@{{ k3s_master_ip }}:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_path }}
+      become: true
+
+    - name: Asegurar que se ha copiado kubeconfig
+      assert:
+        that:
+          - kubeconfig_check.stat.exists
+        fail_msg: "El archivo kubeconfig no se pudo copiar."
+
+    - name: Eliminar cualquier instalación de Traefik previa (si existe)
+      file:
+        path: "{{ traefik_config_dir }}"
+        state: absent
+      become: true
+      ignore_errors: true
+
+    - name: Asegurar que el directorio de Traefik exista
+      file:
+        path: "{{ traefik_config_dir }}"
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Crear archivo acme.json con permisos 600 si no existe
+      file:
+        path: "{{ traefik_config_dir }}/acme.json"
+        state: touch
+        mode: "0600"
+      become: true
+
+    - name: Copiar el archivo kubeconfig al directorio de Traefik
+      copy:
+        src: "{{ kubeconfig_path }}"
+        dest: "{{ traefik_config_dir }}/kubeconfig"
+        mode: "0600"
+      become: true
+
     - name: Obtener el token de K3s desde el master sin Python
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
@@ -29,46 +75,45 @@
       ansible.builtin.set_fact:
         k3s_ca_cert: "{{ k3s_ca_cert_raw.stdout }}"
 
-    - name: Asegurar que el directorio de Traefik exista
-      ansible.builtin.file:
-        path: "{{ traefik_config_dir }}"
-        state: directory
-        mode: "0755"
-
-    - name: Asegurar que el archivo acme.json exista y tenga permisos 600
-      ansible.builtin.file:
-        path: "{{ traefik_config_dir }}/acme.json"
-        state: touch
-        mode: "0600"
-
     - name: Copiar el token de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_token }}"
         dest: "{{ traefik_config_dir }}/k3s_token"
         mode: "0600"
+      become: true
 
     - name: Copiar el certificado de K3s a los balanceadores
       ansible.builtin.copy:
         content: "{{ k3s_ca_cert }}"
         dest: "{{ traefik_config_dir }}/k8s-ca.crt"
         mode: "0600"
+      become: true
 
     - name: Crear `dynamic_conf.toml` si no existe
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}/dynamic_conf.toml"
         state: touch
         mode: "0600"
+      become: true
 
     - name: Escribir configuración inicial en `dynamic_conf.toml`
       ansible.builtin.copy:
         content: "[http.routers]\n"
         dest: "{{ traefik_config_dir }}/dynamic_conf.toml"
         mode: "0600"
+      become: true
 
     - name: Copiar configuración de Traefik
       ansible.builtin.template:
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
+      become: true
+
+    - name: Instalar la biblioteca Kubernetes si no está instalada
+      pip:
+        name: kubernetes
+        state: present
+      become: true
 
     - name: Crear ClusterRole para Traefik
       kubernetes.core.k8s:
@@ -88,6 +133,8 @@
             - apiGroups: ["traefik.containo.us"]
               resources: ["ingressroutes", "middlewares"]
               verbs: ["get", "list", "watch"]
+      environment:
+        K8S_AUTH_KUBECONFIG: "{{ traefik_config_dir }}/kubeconfig"
 
     - name: Crear ClusterRoleBinding para Traefik
       kubernetes.core.k8s:
