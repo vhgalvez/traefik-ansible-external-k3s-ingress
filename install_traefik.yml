@@ -8,6 +8,7 @@
     letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
     kubeconfig_path: "/root/.kube/config"
+  ansible_python_interpreter: /opt/pypy3.9-v7.3.9-linux64/bin/pypy3   # Añadir esta línea
 
   tasks:
     # Instalar bzip2 antes de intentar extraer el archivo
@@ -32,6 +33,12 @@
         path: /opt/bin
         state: directory
         mode: "0755"
+
+    # Eliminar el enlace simbólico si ya existe
+    - name: Eliminar enlace simbólico /opt/bin/python si existe
+      file:
+        path: /opt/bin/python
+        state: absent
 
     - name: Crear enlace simbólico para python
       raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
