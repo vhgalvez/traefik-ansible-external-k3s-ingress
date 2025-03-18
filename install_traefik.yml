@@ -8,6 +8,7 @@
     letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
     kubeconfig_path: "/root/.kube/config"
+    k3s_master_python_interpreter: "/opt/bin/python"
 
   tasks:
     # Verificar si Python 3 está instalado, de lo contrario, instalarlo
@@ -72,8 +73,18 @@
         path: "{{ kubeconfig_path }}"
       register: kubeconfig_check
 
+    - name: Crear directorio .kube en el master
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0700'
+      delegate_to: "{{ k3s_master_ip }}"
+      when: not kubeconfig_check.stat.exists
+      vars:
+        ansible_python_interpreter: "{{ k3s_master_python_interpreter }}"
+
     - name: Copiar kubeconfig desde el master si no existe
-      ansible.builtin.fetch:
+      fetch:
         src: /etc/rancher/k3s/k3s.yaml
         dest: "{{ kubeconfig_path }}"
         flat: yes
@@ -81,6 +92,14 @@
       become: true
       delegate_to: "{{ k3s_master_ip }}"
       register: fetch_result
+      vars:
+        ansible_python_interpreter: "{{ k3s_master_python_interpreter }}"
+      ignore_errors: yes
+
+    - name: Verificar si la copia falló
+      fail:
+        msg: "No se pudo copiar el archivo kubeconfig desde el master"
+      when: fetch_result is failed
 
     - name: Mostrar barra de progreso durante la transferencia
       debug:
