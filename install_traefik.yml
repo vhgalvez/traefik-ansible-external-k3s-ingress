@@ -9,25 +9,7 @@
     traefik_version: "v2.10"
 
   tasks:
-
-    ### 🔴 SOLUCIÓN DEL PROBLEMA DE DOCKER 🔴 ###
-    - name: Eliminar podman-docker si está instalado (evitar conflicto con Docker)
-      ansible.builtin.package:
-        name: podman-docker
-        state: absent
-      ignore_errors: yes
-
-    - name: Limpiar paquetes en conflicto
-      ansible.builtin.command: "dnf clean all"
-      changed_when: false
-
-    - name: Agregar repositorio de Docker
-      ansible.builtin.shell: |
-        dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-      args:
-        creates: /etc/yum.repos.d/docker-ce.repo
-
-    - name: Instalar Docker desde el repositorio oficial
+    - name: Instalar Docker
       ansible.builtin.package:
         name:
           - docker-ce
@@ -36,83 +18,21 @@
         state: present
 
     - name: Iniciar y habilitar Docker
-      service:
+      ansible.builtin.service:
         name: docker
         state: started
         enabled: yes
-
-    ### 🔹 CONFIGURACIÓN DE TRAEFIK 🔹 ###
-    - name: Asegurar que el directorio de configuración de Traefik exista
-      ansible.builtin.file:
-        path: "{{ traefik_config_dir }}"
-        state: directory
-        mode: "0755"
-
-    - name: Copiar configuración de Traefik
-      ansible.builtin.template:
-        src: templates/traefik.toml.j2
-        dest: "{{ traefik_config_dir }}/traefik.toml"
-        mode: "0644"
-
-    ### 🔹 DESPLEGAR TRAEFIK EN KUBERNETES 🔹 ###
-    - name: Instalar la biblioteca Kubernetes en Python
-      ansible.builtin.pip:
-        name: kubernetes
-        state: present
 
     - name: Crear namespace para Traefik
       ansible.builtin.command: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
       changed_when: false
 
-    - name: Desplegar Traefik como Ingress Controller en Kubernetes
-      ansible.builtin.command: >
-        kubectl apply -f - <<EOF
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          name: traefik
-          namespace: {{ traefik_namespace }}
-        spec:
-          replicas: 1
-          selector:
-            matchLabels:
-              app: traefik
-          template:
-            metadata:
-              labels:
-                app: traefik
-            spec:
-              containers:
-              - name: traefik
-                image: traefik:{{ traefik_version }}
-                args:
-                - "--api.insecure=true"
-                - "--providers.kubernetesingress=true"
-                - "--entrypoints.web.address=:80"
-                ports:
-                - name: web
-                  containerPort: 80
-                  protocol: TCP
-        EOF
+    - name: Desplegar Traefik en Kubernetes
+      ansible.builtin.command: "kubectl apply -f - <<EOF\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: traefik\n  namespace: {{ traefik_namespace }}\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: traefik\n  template:\n    metadata:\n      labels:\n        app: traefik\n    spec:\n      containers:\n      - name: traefik\n        image: traefik:{{ traefik_version }}\n        args:\n        - \"--api.insecure=true\"\n        - \"--providers.kubernetesingress=true\"\n        - \"--entrypoints.web.address=:80\"\n        ports:\n        - name: web\n          containerPort: 80\n          protocol: TCP\nEOF"
       changed_when: false
 
     - name: Exponer Traefik con un LoadBalancer
-      ansible.builtin.command: >
-        kubectl apply -f - <<EOF
-        apiVersion: v1
-        kind: Service
-        metadata:
-          name: traefik
-          namespace: {{ traefik_namespace }}
-        spec:
-          selector:
-            app: traefik
-          ports:
-          - protocol: TCP
-            port: 80
-            targetPort: 80
-          type: LoadBalancer
-        EOF
+      ansible.builtin.command: "kubectl apply -f - <<EOF\napiVersion: v1\nkind: Service\nmetadata:\n  name: traefik\n  namespace: {{ traefik_namespace }}\nspec:\n  selector:\n    app: traefik\n  ports:\n  - protocol: TCP\n    port: 80\n    targetPort: 80\n  type: LoadBalancer\nEOF"
       changed_when: false
 
     - name: Verificar si Traefik está en ejecución

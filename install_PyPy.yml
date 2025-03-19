@@ -1,7 +1,9 @@
+---
 - name: Instalar PyPy en nodos Flatcar Linux
   hosts: all
   become: true
-  gather_facts: no  # Evitar fallos por falta de Python
+  gather_facts: no
+
   tasks:
     - name: Verificar si PyPy está instalado
       ansible.builtin.raw: "test -f /opt/bin/python && echo 'installed' || echo 'not installed'"
@@ -14,10 +16,6 @@
 
     - name: Extraer PyPy si no está instalado
       ansible.builtin.raw: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: "'not installed' in pypy_installed.stdout"
-
-    - name: Eliminar archivo tar de PyPy
-      ansible.builtin.raw: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
       when: "'not installed' in pypy_installed.stdout"
 
     - name: Crear enlace simbólico para PyPy
