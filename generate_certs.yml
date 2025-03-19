@@ -8,7 +8,7 @@
 
   tasks:
     - name: Asegurar que la biblioteca cryptography esté instalada
-      pip:
+      ansible.builtin.pip:
         name: cryptography
         state: present
         executable: pip3
