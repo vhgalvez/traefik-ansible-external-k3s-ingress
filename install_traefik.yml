@@ -1,91 +1,102 @@
 ---
-- name: Instalar PyPy y configurar Traefik en los Balanceadores de Carga
+- name: Instalar y Configurar Traefik como Ingress Controller
   hosts: loadbalancer
-  gather_facts: false  # Evita fallos en Flatcar Linux
+  gather_facts: false
   become: true
   vars:
-    traefik_config_dir: "/etc/traefik"
     traefik_namespace: "traefik"
     traefik_service_account: "traefik-sa"
     traefik_cluster_role: "traefik-role"
     traefik_cluster_role_binding: "traefik-role-binding"
     traefik_version: "v2.10"
+    k3s_master_ip: "10.17.4.21"
 
   tasks:
-    - name: Verificar si PyPy ya está instalado
-      ansible.builtin.stat:
-        path: /opt/bin/python
-      register: pypy_installed
-
-    - name: Descargar archivo tar de PyPy si no está instalado
-      ansible.builtin.get_url:
-        url: "https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-        dest: "/opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-        mode: "0644"
-      when: not pypy_installed.stat.exists | default(true)
-
-    - name: Extraer PyPy si no está instalado
-      ansible.builtin.command:
-        cmd: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: not pypy_installed.stat.exists | default(true)
-
-    - name: Eliminar archivo tar de PyPy
-      ansible.builtin.file:
-        path: "/opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-        state: absent
-      when: not pypy_installed.stat.exists | default(true)
-
-    - name: Crear directorio /opt/bin si no existe
-      ansible.builtin.file:
-        path: /opt/bin
-        state: directory
-        mode: "0755"
-
-    - name: Crear enlace simbólico para PyPy
-      ansible.builtin.file:
-        src: "/opt/pypy3.9-v7.3.9-linux64/bin/pypy3"
-        dest: "/opt/bin/python"
-        state: link
-      when: not pypy_installed.stat.exists | default(true)
-
-    - name: Verificar instalación de PyPy
-      ansible.builtin.command:
-        cmd: "/opt/bin/python --version"
-      register: pypy_version
-      changed_when: false
-
-    - name: Mostrar versión de PyPy instalada
-      ansible.builtin.debug:
-        msg: "PyPy instalado: {{ pypy_version.stdout }}"
-
-    - name: Instalar paquetes necesarios
+    - name: Instalar docker en los balanceadores de carga
       package:
-        name:
-          - python3
-          - python3-pip
-          - python3-cryptography
-          - openssh-clients
-          - ca-certificates
+        name: docker
         state: present
+
+    - name: Iniciar y habilitar Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Descargar imagen de Traefik
+      ansible.builtin.shell: "docker pull traefik:{{ traefik_version }}"
+      changed_when: false
 
     - name: Asegurar que el directorio de configuración de Traefik exista
       file:
-        path: "{{ traefik_config_dir }}"
+        path: "/etc/traefik"
         state: directory
         mode: "0755"
 
     - name: Copiar configuración de Traefik
       template:
         src: templates/traefik.toml.j2
-        dest: "{{ traefik_config_dir }}/traefik.toml"
+        dest: "/etc/traefik/traefik.toml"
 
-    - name: Instalar la biblioteca Kubernetes en Python
-      pip:
-        name: kubernetes
-        state: present
+    - name: Instalar `kubectl` en los balanceadores de carga
+      ansible.builtin.shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+      args:
+        creates: /usr/local/bin/kubectl
 
     - name: Crear namespace para Traefik
       ansible.builtin.raw: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
+      changed_when: false
+
+    - name: Crear ServiceAccount para Traefik
+      ansible.builtin.raw: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: {{ traefik_service_account }}
+          namespace: {{ traefik_namespace }}
+        EOF
+      changed_when: false
+
+    - name: Crear ClusterRole para Traefik
+      ansible.builtin.raw: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: {{ traefik_cluster_role }}
+        rules:
+        - apiGroups: [""]
+          resources: ["services", "endpoints", "pods", "secrets"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["networking.k8s.io"]
+          resources: ["ingresses", "ingressclasses"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["traefik.containo.us"]
+          resources: ["middlewares", "ingressroutes"]
+          verbs: ["get", "list", "watch"]
+        EOF
+      changed_when: false
+
+    - name: Crear ClusterRoleBinding para Traefik
+      ansible.builtin.raw: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: {{ traefik_cluster_role_binding }}
+        subjects:
+        - kind: ServiceAccount
+          name: {{ traefik_service_account }}
+          namespace: {{ traefik_namespace }}
+        roleRef:
+          kind: ClusterRole
+          name: {{ traefik_cluster_role }}
+          apiGroup: rbac.authorization.k8s.io
+        EOF
       changed_when: false
 
     - name: Desplegar Traefik como Ingress Controller
@@ -114,9 +125,14 @@
                 - "--api.insecure=true"
                 - "--providers.kubernetesingress=true"
                 - "--entrypoints.web.address=:80"
+                - "--entrypoints.websecure.address=:443"
+                - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
                 ports:
                 - name: web
                   containerPort: 80
+                  protocol: TCP
+                - name: websecure
+                  containerPort: 443
                   protocol: TCP
         EOF
       changed_when: false
@@ -136,6 +152,9 @@
           - protocol: TCP
             port: 80
             targetPort: 80
+          - protocol: TCP
+            port: 443
+            targetPort: 443
           type: LoadBalancer
         EOF
       changed_when: false
