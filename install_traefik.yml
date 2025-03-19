@@ -1,44 +1,64 @@
 ---
 - name: Instalar PyPy y configurar Traefik en los Balanceadores de Carga
   hosts: loadbalancer
+  gather_facts: false  # Evita fallos en Flatcar Linux
   become: true
   vars:
     traefik_config_dir: "/etc/traefik"
-    traefik_domain: "traefik.local"
-    letsencrypt_email: "tu-email@dominio.com"
-    k3s_master_ip: "10.17.4.21"
-    kubeconfig_path: "/root/.kube/config"
-  ansible_python_interpreter: /opt/pypy3.9-v7.3.9-linux64/bin/pypy3   # Uso de PyPy como intérprete Python
+    traefik_namespace: "traefik"
+    traefik_service_account: "traefik-sa"
+    traefik_cluster_role: "traefik-role"
+    traefik_cluster_role_binding: "traefik-role-binding"
+    traefik_version: "v2.10"
 
   tasks:
-    # Instalar bzip2 antes de intentar extraer el archivo
-    - name: Instalar bzip2
-      package:
-        name: bzip2
-        state: present
+    - name: Verificar si PyPy ya está instalado
+      ansible.builtin.stat:
+        path: /opt/bin/python
+      register: pypy_installed
 
-    # Instalar PyPy en nodos Flatcar
-    - name: Descargar archivo tar de PyPy
-      raw: wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2
+    - name: Descargar archivo tar de PyPy si no está instalado
+      ansible.builtin.get_url:
+        url: "https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+        dest: "/opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+        mode: "0644"
+      when: not pypy_installed.stat.exists | default(true)
 
-    - name: Extraer PyPy (con tar -xjf para descomprimir .bz2)
-      raw: tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt
+    - name: Extraer PyPy si no está instalado
+      ansible.builtin.command:
+        cmd: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      when: not pypy_installed.stat.exists | default(true)
 
-    - name: Eliminar archivo tar
-      raw: rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2
+    - name: Eliminar archivo tar de PyPy
+      ansible.builtin.file:
+        path: "/opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+        state: absent
+      when: not pypy_installed.stat.exists | default(true)
 
-    # Asegurar que /opt/bin/ exista antes de crear el enlace simbólico
     - name: Crear directorio /opt/bin si no existe
-      file:
+      ansible.builtin.file:
         path: /opt/bin
         state: directory
         mode: "0755"
 
-    - name: Crear enlace simbólico para python
-      raw: ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python
+    - name: Crear enlace simbólico para PyPy
+      ansible.builtin.file:
+        src: "/opt/pypy3.9-v7.3.9-linux64/bin/pypy3"
+        dest: "/opt/bin/python"
+        state: link
+      when: not pypy_installed.stat.exists | default(true)
 
-    # Instalación y configuración de Traefik en los Balanceadores de Carga
-    - name: Instalar dependencias necesarias en los balanceadores
+    - name: Verificar instalación de PyPy
+      ansible.builtin.command:
+        cmd: "/opt/bin/python --version"
+      register: pypy_version
+      changed_when: false
+
+    - name: Mostrar versión de PyPy instalada
+      ansible.builtin.debug:
+        msg: "PyPy instalado: {{ pypy_version.stdout }}"
+
+    - name: Instalar paquetes necesarios
       package:
         name:
           - python3
@@ -48,76 +68,11 @@
           - ca-certificates
         state: present
 
-    - name: Verificar si kubeconfig existe
-      stat:
-        path: "{{ kubeconfig_path }}"
-      register: kubeconfig_check
-
-    - name: Copiar kubeconfig desde el master si no existe
-      ansible.builtin.fetch:
-        src: /etc/rancher/k3s/k3s.yaml
-        dest: "{{ kubeconfig_path }}"
-        flat: yes
-      when: not kubeconfig_check.stat.exists
-      become: true
-      delegate_to: "{{ k3s_master_ip }}"
-      register: fetch_result
-
-    - name: Mostrar barra de progreso durante la transferencia
-      debug:
-        msg: "Copiando kubeconfig desde el master..."
-      when: fetch_result is defined and fetch_result.changed
-
-    - name: Asegurar que el directorio de Traefik exista
+    - name: Asegurar que el directorio de configuración de Traefik exista
       file:
         path: "{{ traefik_config_dir }}"
         state: directory
         mode: "0755"
-
-    - name: Asegurar que el archivo acme.json exista y tenga permisos 600
-      file:
-        path: "{{ traefik_config_dir }}/acme.json"
-        state: touch
-        mode: "0600"
-
-    - name: Copiar el archivo kubeconfig al directorio de Traefik
-      copy:
-        src: "{{ kubeconfig_path }}"
-        dest: "{{ traefik_config_dir }}/kubeconfig"
-        mode: "0600"
-      when: kubeconfig_check.stat.exists
-
-    - name: Obtener el token de K3s desde el master
-      ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
-      delegate_to: "{{ k3s_master_ip }}"
-      register: k3s_token_raw
-      changed_when: false
-
-    - name: Guardar el token de K3s
-      ansible.builtin.set_fact:
-        k3s_token: "{{ k3s_token_raw.stdout | trim }}"
-
-    - name: Obtener el certificado del API de K3s
-      ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/tls/server-ca.crt"
-      delegate_to: "{{ k3s_master_ip }}"
-      register: k3s_ca_cert_raw
-      changed_when: false
-
-    - name: Guardar certificado de K3s
-      ansible.builtin.set_fact:
-        k3s_ca_cert: "{{ k3s_ca_cert_raw.stdout }}"
-
-    - name: Copiar token de K3s
-      copy:
-        content: "{{ k3s_token }}"
-        dest: "{{ traefik_config_dir }}/k3s_token"
-        mode: "0600"
-
-    - name: Copiar certificado de K3s
-      copy:
-        content: "{{ k3s_ca_cert }}"
-        dest: "{{ traefik_config_dir }}/k8s-ca.crt"
-        mode: "0600"
 
     - name: Copiar configuración de Traefik
       template:
@@ -129,46 +84,67 @@
         name: kubernetes
         state: present
 
-    - name: Crear ClusterRole para Traefik
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: rbac.authorization.k8s.io/v1
-          kind: ClusterRole
-          metadata:
-            name: traefik-role
-          rules:
-            - apiGroups: [""] 
-              resources: ["pods", "services", "endpoints", "secrets", "configmaps"]
-              verbs: ["get", "list", "watch"]
-            - apiGroups: ["networking.k8s.io"]
-              resources: ["ingresses", "ingressclasses"]
-              verbs: ["get", "list", "watch"]
-            - apiGroups: ["traefik.containo.us"]
-              resources: ["ingressroutes", "middlewares"]
-              verbs: ["get", "list", "watch"]
-      environment:
-        K8S_AUTH_KUBECONFIG: "{{ traefik_config_dir }}/kubeconfig"
+    - name: Crear namespace para Traefik
+      ansible.builtin.raw: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
+      changed_when: false
 
-    - name: Crear ClusterRoleBinding para Traefik
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: rbac.authorization.k8s.io/v1
-          kind: ClusterRoleBinding
-          metadata:
-            name: traefik-role-binding
-          subjects:
-            - kind: ServiceAccount
-              name: traefik
-              namespace: kube-system
-          roleRef:
-            kind: ClusterRole
-            name: traefik-role
-            apiGroup: rbac.authorization.k8s.io
+    - name: Desplegar Traefik como Ingress Controller
+      ansible.builtin.raw: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: traefik
+          namespace: {{ traefik_namespace }}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: traefik
+          template:
+            metadata:
+              labels:
+                app: traefik
+            spec:
+              serviceAccountName: {{ traefik_service_account }}
+              containers:
+              - name: traefik
+                image: traefik:{{ traefik_version }}
+                args:
+                - "--api.insecure=true"
+                - "--providers.kubernetesingress=true"
+                - "--entrypoints.web.address=:80"
+                ports:
+                - name: web
+                  containerPort: 80
+                  protocol: TCP
+        EOF
+      changed_when: false
 
-    - name: Reiniciar Traefik
-      shell: "docker restart traefik || docker-compose up -d"
-      args:
-        chdir: "{{ traefik_config_dir }}"
-      become: true
+    - name: Exponer Traefik con un LoadBalancer
+      ansible.builtin.raw: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: traefik
+          namespace: {{ traefik_namespace }}
+        spec:
+          selector:
+            app: traefik
+          ports:
+          - protocol: TCP
+            port: 80
+            targetPort: 80
+          type: LoadBalancer
+        EOF
+      changed_when: false
+
+    - name: Verificar si Traefik está en ejecución
+      ansible.builtin.raw: "kubectl get pods -n {{ traefik_namespace }}"
+      register: traefik_status
+      changed_when: false
+
+    - name: Mostrar estado de Traefik
+      debug:
+        msg: "{{ traefik_status.stdout_lines }}"

@@ -1,32 +1,34 @@
 - name: Instalar PyPy en nodos Flatcar Linux
   hosts: all
   become: true
-  gather_facts: no  # Deshabilitar la recopilación de hechos
+  gather_facts: no  # Evitar fallos por falta de Python
   tasks:
     - name: Verificar si PyPy está instalado
-      shell: "test -f /opt/bin/python && echo 'installed' || echo 'not installed'"
+      ansible.builtin.raw: "test -f /opt/bin/python && echo 'installed' || echo 'not installed'"
       register: pypy_installed
+      changed_when: false
 
-    - name: Descargar archivo tar de PyPy
-      shell: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: pypy_installed.stdout == "not installed"
+    - name: Descargar archivo tar de PyPy si no está instalado
+      ansible.builtin.raw: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: "'not installed' in pypy_installed.stdout"
 
-    - name: Extraer PyPy
-      shell: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: pypy_installed.stdout == "not installed"
+    - name: Extraer PyPy si no está instalado
+      ansible.builtin.raw: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      when: "'not installed' in pypy_installed.stdout"
 
-    - name: Eliminar archivo tar
-      shell: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: pypy_installed.stdout == "not installed"
+    - name: Eliminar archivo tar de PyPy
+      ansible.builtin.raw: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: "'not installed' in pypy_installed.stdout"
 
     - name: Crear enlace simbólico para PyPy
-      shell: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
-      when: pypy_installed.stdout == "not installed"
+      ansible.builtin.raw: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
+      when: "'not installed' in pypy_installed.stdout"
 
     - name: Verificar instalación de PyPy
-      shell: "/opt/bin/python --version"
+      ansible.builtin.raw: "/opt/bin/python --version"
       register: pypy_version
+      changed_when: false
 
-    - name: Mostrar versión de PyPy
-      debug:
-        msg: "PyPy version installed: {{ pypy_version.stdout }}"
+    - name: Mostrar versión de PyPy instalada
+      ansible.builtin.debug:
+        msg: "PyPy instalado: {{ pypy_version.stdout }}"
