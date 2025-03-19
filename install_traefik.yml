@@ -4,17 +4,35 @@
   gather_facts: false
   become: true
   vars:
+    traefik_config_dir: "/etc/traefik"
     traefik_namespace: "traefik"
-    traefik_service_account: "traefik-sa"
-    traefik_cluster_role: "traefik-role"
-    traefik_cluster_role_binding: "traefik-role-binding"
     traefik_version: "v2.10"
-    k3s_master_ip: "10.17.4.21"
 
   tasks:
-    - name: Instalar docker en los balanceadores de carga
-      package:
-        name: docker
+
+    ### 🔴 SOLUCIÓN DEL PROBLEMA DE DOCKER 🔴 ###
+    - name: Eliminar podman-docker si está instalado (evitar conflicto con Docker)
+      ansible.builtin.package:
+        name: podman-docker
+        state: absent
+      ignore_errors: yes
+
+    - name: Limpiar paquetes en conflicto
+      ansible.builtin.command: "dnf clean all"
+      changed_when: false
+
+    - name: Agregar repositorio de Docker
+      ansible.builtin.shell: |
+        dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+    - name: Instalar Docker desde el repositorio oficial
+      ansible.builtin.package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
         state: present
 
     - name: Iniciar y habilitar Docker
@@ -23,85 +41,32 @@
         state: started
         enabled: yes
 
-    - name: Descargar imagen de Traefik
-      ansible.builtin.shell: "docker pull traefik:{{ traefik_version }}"
-      changed_when: false
-
+    ### 🔹 CONFIGURACIÓN DE TRAEFIK 🔹 ###
     - name: Asegurar que el directorio de configuración de Traefik exista
-      file:
-        path: "/etc/traefik"
+      ansible.builtin.file:
+        path: "{{ traefik_config_dir }}"
         state: directory
         mode: "0755"
 
     - name: Copiar configuración de Traefik
-      template:
+      ansible.builtin.template:
         src: templates/traefik.toml.j2
-        dest: "/etc/traefik/traefik.toml"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
 
-    - name: Instalar `kubectl` en los balanceadores de carga
-      ansible.builtin.shell: |
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        mv kubectl /usr/local/bin/
-      args:
-        creates: /usr/local/bin/kubectl
+    ### 🔹 DESPLEGAR TRAEFIK EN KUBERNETES 🔹 ###
+    - name: Instalar la biblioteca Kubernetes en Python
+      ansible.builtin.pip:
+        name: kubernetes
+        state: present
 
     - name: Crear namespace para Traefik
-      ansible.builtin.raw: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
+      ansible.builtin.command: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
       changed_when: false
 
-    - name: Crear ServiceAccount para Traefik
-      ansible.builtin.raw: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: v1
-        kind: ServiceAccount
-        metadata:
-          name: {{ traefik_service_account }}
-          namespace: {{ traefik_namespace }}
-        EOF
-      changed_when: false
-
-    - name: Crear ClusterRole para Traefik
-      ansible.builtin.raw: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: {{ traefik_cluster_role }}
-        rules:
-        - apiGroups: [""]
-          resources: ["services", "endpoints", "pods", "secrets"]
-          verbs: ["get", "list", "watch"]
-        - apiGroups: ["networking.k8s.io"]
-          resources: ["ingresses", "ingressclasses"]
-          verbs: ["get", "list", "watch"]
-        - apiGroups: ["traefik.containo.us"]
-          resources: ["middlewares", "ingressroutes"]
-          verbs: ["get", "list", "watch"]
-        EOF
-      changed_when: false
-
-    - name: Crear ClusterRoleBinding para Traefik
-      ansible.builtin.raw: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRoleBinding
-        metadata:
-          name: {{ traefik_cluster_role_binding }}
-        subjects:
-        - kind: ServiceAccount
-          name: {{ traefik_service_account }}
-          namespace: {{ traefik_namespace }}
-        roleRef:
-          kind: ClusterRole
-          name: {{ traefik_cluster_role }}
-          apiGroup: rbac.authorization.k8s.io
-        EOF
-      changed_when: false
-
-    - name: Desplegar Traefik como Ingress Controller
-      ansible.builtin.raw: |
-        cat <<EOF | kubectl apply -f -
+    - name: Desplegar Traefik como Ingress Controller en Kubernetes
+      ansible.builtin.command: >
+        kubectl apply -f - <<EOF
         apiVersion: apps/v1
         kind: Deployment
         metadata:
@@ -117,7 +82,6 @@
               labels:
                 app: traefik
             spec:
-              serviceAccountName: {{ traefik_service_account }}
               containers:
               - name: traefik
                 image: traefik:{{ traefik_version }}
@@ -125,21 +89,16 @@
                 - "--api.insecure=true"
                 - "--providers.kubernetesingress=true"
                 - "--entrypoints.web.address=:80"
-                - "--entrypoints.websecure.address=:443"
-                - "--certificatesresolvers.default.acme.httpchallenge.entrypoint=web"
                 ports:
                 - name: web
                   containerPort: 80
-                  protocol: TCP
-                - name: websecure
-                  containerPort: 443
                   protocol: TCP
         EOF
       changed_when: false
 
     - name: Exponer Traefik con un LoadBalancer
-      ansible.builtin.raw: |
-        cat <<EOF | kubectl apply -f -
+      ansible.builtin.command: >
+        kubectl apply -f - <<EOF
         apiVersion: v1
         kind: Service
         metadata:
@@ -152,18 +111,15 @@
           - protocol: TCP
             port: 80
             targetPort: 80
-          - protocol: TCP
-            port: 443
-            targetPort: 443
           type: LoadBalancer
         EOF
       changed_when: false
 
     - name: Verificar si Traefik está en ejecución
-      ansible.builtin.raw: "kubectl get pods -n {{ traefik_namespace }}"
+      ansible.builtin.command: "kubectl get pods -n {{ traefik_namespace }}"
       register: traefik_status
       changed_when: false
 
     - name: Mostrar estado de Traefik
-      debug:
+      ansible.builtin.debug:
         msg: "{{ traefik_status.stdout_lines }}"
