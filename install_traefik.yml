@@ -1,6 +1,7 @@
 ---
 - name: Instalar PyPy y configurar Traefik en los Balanceadores de Carga
   hosts: loadbalancer
+  gather_facts: false  # No intentamos recoger facts porque Ansible necesita Python
   become: true
   vars:
     traefik_config_dir: "/etc/traefik"
@@ -8,53 +9,44 @@
     letsencrypt_email: "tu-email@dominio.com"
     k3s_master_ip: "10.17.4.21"
     kubeconfig_path: "/root/.kube/config"
-    k3s_master_python_interpreter: "/opt/bin/python"
+    pypy_path: "/opt/bin/python"
 
   tasks:
-    # Instalar bzip2 antes de intentar extraer el archivo
-    - name: Instalar bzip2
-      package:
-        name: bzip2
-        state: present
+    - name: Verificar si PyPy está instalado
+      ansible.builtin.raw: "[ -x {{ pypy_path }} ] && echo 'yes' || echo 'no'"
+      register: pypy_installed
+      changed_when: false
 
-    # Descargar y extraer PyPy solo si no está ya instalado
-    - name: Descargar archivo tar de PyPy
-      command: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not pypy_installed.stat.exists
+    - name: Descargar PyPy si no está instalado
+      ansible.builtin.raw: "wget -q -P /opt/ https://downloads.python.org/pypy/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: pypy_installed.stdout != "yes"
 
     - name: Extraer PyPy
-      command: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
-      when: not pypy_installed.stat.exists
+      ansible.builtin.raw: "tar -xjf /opt/pypy3.9-v7.3.9-linux64.tar.bz2 -C /opt"
+      when: pypy_installed.stdout != "yes"
 
-    - name: Eliminar archivo tar
-      command: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
-      when: not pypy_installed.stat.exists
+    - name: Eliminar archivo tar de PyPy
+      ansible.builtin.raw: "rm -rf /opt/pypy3.9-v7.3.9-linux64.tar.bz2"
+      when: pypy_installed.stdout != "yes"
 
-    # Asegurar que /opt/bin/ exista antes de crear el enlace simbólico
     - name: Crear directorio /opt/bin si no existe
-      file:
-        path: /opt/bin
-        state: directory
-        mode: "0755"
+      ansible.builtin.raw: "mkdir -p /opt/bin"
+      when: pypy_installed.stdout != "yes"
 
-    # Eliminar el enlace simbólico si ya existe
-    - name: Eliminar enlace simbólico /opt/bin/python si existe
-      file:
-        path: /opt/bin/python
-        state: absent
+    - name: Crear enlace simbólico para PyPy
+      ansible.builtin.raw: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
+      when: pypy_installed.stdout != "yes"
 
-    - name: Crear enlace simbólico para python
-      command: "ln -s /opt/pypy3.9-v7.3.9-linux64/bin/pypy3 /opt/bin/python"
+    - name: Configurar Python en Ansible
+      set_fact:
+        ansible_python_interpreter: "{{ pypy_path }}"
 
-    # Instalación y configuración de Traefik en los Balanceadores de Carga
-    - name: Instalar dependencias necesarias en los balanceadores
+    - name: Instalar dependencias necesarias
       package:
         name:
-          - python3
-          - python3-pip
-          - python3-cryptography
-          - openssh-clients
           - ca-certificates
+          - openssh-clients
+          - bzip2
         state: present
 
     - name: Verificar si kubeconfig existe
@@ -71,11 +63,6 @@
       become: true
       delegate_to: "{{ k3s_master_ip }}"
       register: fetch_result
-
-    - name: Mostrar barra de progreso durante la transferencia
-      debug:
-        msg: "Copiando kubeconfig desde el master..."
-      when: fetch_result is defined and fetch_result.changed
 
     - name: Asegurar que el directorio de Traefik exista
       file:
@@ -96,7 +83,7 @@
         mode: "0600"
       when: kubeconfig_check.stat.exists
 
-    - name: Obtener el token de K3s desde el master
+    - name: Obtener el token de K3s
       ansible.builtin.raw: "sudo cat /var/lib/rancher/k3s/server/node-token"
       delegate_to: "{{ k3s_master_ip }}"
       register: k3s_token_raw
@@ -133,51 +120,20 @@
         src: templates/traefik.toml.j2
         dest: "{{ traefik_config_dir }}/traefik.toml"
 
-    - name: Instalar la biblioteca Kubernetes en Python
-      pip:
-        name: kubernetes
-        state: present
+    - name: Instalar Docker si no está instalado
+      ansible.builtin.raw: |
+        if ! command -v docker &> /dev/null; then
+          curl -fsSL https://get.docker.com | sh
+        fi
 
-    - name: Crear ClusterRole para Traefik
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: rbac.authorization.k8s.io/v1
-          kind: ClusterRole
-          metadata:
-            name: traefik-role
-          rules:
-            - apiGroups: [""] 
-              resources: ["pods", "services", "endpoints", "secrets", "configmaps"]
-              verbs: ["get", "list", "watch"]
-            - apiGroups: ["networking.k8s.io"]
-              resources: ["ingresses", "ingressclasses"]
-              verbs: ["get", "list", "watch"]
-            - apiGroups: ["traefik.containo.us"]
-              resources: ["ingressroutes", "middlewares"]
-              verbs: ["get", "list", "watch"]
-      environment:
-        K8S_AUTH_KUBECONFIG: "{{ traefik_config_dir }}/kubeconfig"
+    - name: Descargar imagen de Traefik
+      ansible.builtin.raw: "docker pull traefik:v2.10"
 
-    - name: Crear ClusterRoleBinding para Traefik
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: rbac.authorization.k8s.io/v1
-          kind: ClusterRoleBinding
-          metadata:
-            name: traefik-role-binding
-          subjects:
-            - kind: ServiceAccount
-              name: traefik
-              namespace: kube-system
-          roleRef:
-            kind: ClusterRole
-            name: traefik-role
-            apiGroup: rbac.authorization.k8s.io
-
-    - name: Reiniciar Traefik
-      shell: "docker restart traefik || docker-compose up -d"
-      args:
-        chdir: "{{ traefik_config_dir }}"
-      become: true
+    - name: Crear y ejecutar el contenedor de Traefik
+      ansible.builtin.raw: |
+        docker run -d --name traefik \
+        --restart=always \
+        -p 80:80 -p 443:443 \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v {{ traefik_config_dir }}:/etc/traefik \
+        traefik:v2.10
