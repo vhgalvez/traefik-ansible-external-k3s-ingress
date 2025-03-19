@@ -1,38 +1,50 @@
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller
   hosts: loadbalancer
-  gather_facts: false
   become: true
   vars:
-    traefik_config_dir: "/etc/traefik"
     traefik_namespace: "traefik"
     traefik_version: "v2.10"
+    traefik_chart_version: "20.8.0"
+    kubeconfig_path: "/root/.kube/config"
 
   tasks:
-    - name: Instalar Docker
-      ansible.builtin.package:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-        state: present
+    - name: Verificar si kubectl está instalado
+      ansible.builtin.command: "kubectl version --client"
+      register: kubectl_installed
+      ignore_errors: yes
+      changed_when: false
 
-    - name: Iniciar y habilitar Docker
-      ansible.builtin.service:
-        name: docker
-        state: started
-        enabled: yes
+    - name: Detener ejecución si kubectl no está instalado
+      ansible.builtin.fail:
+        msg: "kubectl no está instalado en el nodo. Ejecuta 'install_kubectl_and_kubeconfig.yml' primero."
+      when: kubectl_installed.failed
 
     - name: Crear namespace para Traefik
       ansible.builtin.command: "kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
       changed_when: false
 
-    - name: Desplegar Traefik en Kubernetes
-      ansible.builtin.command: "kubectl apply -f - <<EOF\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: traefik\n  namespace: {{ traefik_namespace }}\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: traefik\n  template:\n    metadata:\n      labels:\n        app: traefik\n    spec:\n      containers:\n      - name: traefik\n        image: traefik:{{ traefik_version }}\n        args:\n        - \"--api.insecure=true\"\n        - \"--providers.kubernetesingress=true\"\n        - \"--entrypoints.web.address=:80\"\n        ports:\n        - name: web\n          containerPort: 80\n          protocol: TCP\nEOF"
+    - name: Instalar Helm en los balanceadores de carga
+      ansible.builtin.shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Agregar repositorio de Traefik en Helm
+      ansible.builtin.command: "helm repo add traefik https://helm.traefik.io/traefik"
       changed_when: false
 
-    - name: Exponer Traefik con un LoadBalancer
-      ansible.builtin.command: "kubectl apply -f - <<EOF\napiVersion: v1\nkind: Service\nmetadata:\n  name: traefik\n  namespace: {{ traefik_namespace }}\nspec:\n  selector:\n    app: traefik\n  ports:\n  - protocol: TCP\n    port: 80\n    targetPort: 80\n  type: LoadBalancer\nEOF"
+    - name: Actualizar repositorios de Helm
+      ansible.builtin.command: "helm repo update"
+      changed_when: false
+
+    - name: Desplegar Traefik en Kubernetes usando Helm
+      ansible.builtin.command: >
+        helm upgrade --install traefik traefik/traefik
+        --namespace {{ traefik_namespace }}
+        --version {{ traefik_chart_version }}
+        --set service.type=LoadBalancer
+        --set ingressRoute.dashboard.enabled=true
       changed_when: false
 
     - name: Verificar si Traefik está en ejecución
@@ -43,3 +55,36 @@
     - name: Mostrar estado de Traefik
       ansible.builtin.debug:
         msg: "{{ traefik_status.stdout_lines }}"
+
+    - name: Exponer la interfaz web de Traefik
+      ansible.builtin.command: >
+        kubectl apply -f - <<EOF
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: traefik-dashboard
+          namespace: {{ traefik_namespace }}
+        spec:
+          rules:
+          - host: traefik.local
+            http:
+              paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: traefik
+                    port:
+                      number: 80
+        EOF
+      changed_when: false
+
+    - name: Verificar la dirección IP pública del LoadBalancer
+      ansible.builtin.command: "kubectl get svc -n {{ traefik_namespace }} traefik -o=jsonpath='{.status.loadBalancer.ingress[0].ip}'"
+      register: traefik_lb_ip
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Mostrar la dirección IP del LoadBalancer de Traefik
+      ansible.builtin.debug:
+        msg: "La IP de Traefik LoadBalancer es: {{ traefik_lb_ip.stdout }}"
