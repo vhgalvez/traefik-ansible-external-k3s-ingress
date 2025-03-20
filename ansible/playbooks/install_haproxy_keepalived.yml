@@ -45,7 +45,7 @@
 
     - name: Configurar Keepalived con VRRP
       ansible.builtin.template:
-        src: "templates/keepalived.conf.j2"
+        src: "../../templates/keepalived/keepalived.conf.j2"
         dest: "{{ keepalived_config_path }}"
         mode: "0644"
       notify: Restart Keepalived
