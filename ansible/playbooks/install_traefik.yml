@@ -30,7 +30,7 @@
 
     - name: Crear archivo de configuración de Traefik
       ansible.builtin.template:
-        src: "templates/traefik/traefik.toml.j2"
+        src: "../../templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
 
