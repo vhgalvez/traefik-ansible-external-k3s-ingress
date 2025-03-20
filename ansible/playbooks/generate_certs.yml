@@ -1,6 +1,6 @@
 ---
 - name: Generar certificados SSL para Traefik
-  hosts: loadbalancer
+  hosts: load_balancers
   become: true
   vars:
     certs_dir: "/etc/traefik/certs"
@@ -13,20 +13,11 @@
         state: present
         executable: pip3
 
-    - name: Asegurar que el directorio de certificados exista
+    - name: Crear directorio de certificados
       ansible.builtin.file:
         path: "{{ certs_dir }}"
         state: directory
         mode: "0755"
-
-    - name: Eliminar certificados previos si existen
-      ansible.builtin.file:
-        path: "{{ certs_dir }}/{{ item }}"
-        state: absent
-      loop:
-        - traefik.key
-        - traefik.csr
-        - traefik.crt
 
     - name: Generar clave privada
       community.crypto.openssl_privatekey:

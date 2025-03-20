@@ -1,115 +1,67 @@
 ---
-- name: Instalar y configurar HAProxy y Keepalived en los Load Balancers
-  hosts: loadbalancer
+- name: Instalar y Configurar HAProxy + Keepalived para Kubernetes API Load Balancing
+  hosts: haproxy_keepalived
   become: true
   vars:
-    haproxy_config_path: "/etc/haproxy/haproxy.cfg"
-    keepalived_config_path: "/etc/keepalived/keepalived.conf"
-    vip_address: "10.17.3.10"
-    interface: "eth0"
-    priority_lb1: 150
-    priority_lb2: 100
+    haproxy_config_dir: "/etc/haproxy"
+    keepalived_config_dir: "/etc/keepalived"
+    haproxy_config_template: "haproxy/haproxy.cfg.j2"
+    keepalived_config_template: "keepalived/keepalived.conf.j2"
 
   tasks:
     - name: Instalar HAProxy y Keepalived
-      ansible.builtin.dnf:
+      ansible.builtin.package:
         name:
           - haproxy
           - keepalived
         state: present
 
-    - name: Crear directorios de configuración si no existen
+    - name: Asegurar que el directorio de configuración de HAProxy existe
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: "{{ haproxy_config_dir }}"
         state: directory
         mode: "0755"
-      loop:
-        - "/etc/haproxy"
-        - "/etc/keepalived"
 
-    - name: Configurar HAProxy con Health Checks y Timeouts
-      template:
-        src: ../../templates/haproxy/haproxy.cfg.j2
-        dest: /etc/haproxy/haproxy.cfg
+    - name: Copiar configuración de HAProxy
+      ansible.builtin.template:
+        src: "{{ haproxy_config_template }}"
+        dest: "{{ haproxy_config_dir }}/haproxy.cfg"
         owner: root
         group: root
         mode: "0644"
-      notify: Restart HAProxy
+      notify: Reiniciar HAProxy
 
-    - name: Validar configuración de HAProxy
-      ansible.builtin.command:
-        cmd: "haproxy -c -f {{ haproxy_config_path }}"
-      register: haproxy_check
-      changed_when: false
-      failed_when: haproxy_check.rc != 0
+    - name: Asegurar que el directorio de configuración de Keepalived existe
+      ansible.builtin.file:
+        path: "{{ keepalived_config_dir }}"
+        state: directory
+        mode: "0755"
 
-    - name: Configurar Keepalived con VRRP
+    - name: Copiar configuración de Keepalived
       ansible.builtin.template:
-        src: "../../templates/keepalived/keepalived.conf.j2"
-        dest: "{{ keepalived_config_path }}"
+        src: "{{ keepalived_config_template }}"
+        dest: "{{ keepalived_config_dir }}/keepalived.conf"
+        owner: root
+        group: root
         mode: "0644"
-      notify: Restart Keepalived
-
-    - name: Verificar estado de SELinux
-      ansible.builtin.command: "getenforce"
-      register: selinux_status
-      changed_when: false
-
-    - name: Configurar SELinux para HAProxy
-      ansible.builtin.command:
-        cmd: setsebool -P haproxy_connect_any 1
-      when: "'Enforcing' in selinux_status.stdout or 'Permissive' in selinux_status.stdout"
-
-    - name: Abrir puertos en Firewalld
-      ansible.builtin.firewalld:
-        port: "{{ item }}/tcp"
-        permanent: true
-        state: enabled
-      loop:
-        - "80"
-        - "443"
-        - "5001"
-        - "5002"
-        - "5003"
-        - "5004"
-        - "1988"
-      notify: Reload Firewalld
+      notify: Reiniciar Keepalived
 
     - name: Habilitar y arrancar HAProxy y Keepalived
       ansible.builtin.systemd:
         name: "{{ item }}"
         enabled: true
-        state: restarted
+        state: started
       loop:
         - haproxy
         - keepalived
-      register: service_status
-      ignore_errors: true
-
-    - name: Mostrar errores de HAProxy si falla el arranque
-      ansible.builtin.shell: "journalctl -xeu haproxy.service | tail -n 20"
-      register: haproxy_logs
-      changed_when: false
-      when: service_status.results[0].failed
-      ignore_errors: true
-
-    - name: Mostrar logs de HAProxy si falló el servicio
-      ansible.builtin.debug:
-        msg: "{{ haproxy_logs.stdout_lines }}"
-      when: service_status.results[0].failed
 
   handlers:
-    - name: Restart HAProxy
+    - name: Reiniciar HAProxy
       ansible.builtin.systemd:
         name: haproxy
         state: restarted
 
-    - name: Restart Keepalived
+    - name: Reiniciar Keepalived
       ansible.builtin.systemd:
         name: keepalived
         state: restarted
-
-    - name: Reload Firewalld
-      ansible.builtin.service:
-        name: firewalld
-        state: reloaded
