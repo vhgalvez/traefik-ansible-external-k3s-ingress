@@ -2,16 +2,15 @@ version: "3.9"
 
 services:
   traefik:
-    image: "{{ traefik_docker_image }}"
+    image: "traefik:v3.3"
     container_name: traefik
     restart: always
     command:
       - --api.dashboard=true
       - --providers.docker=true
-      - --providers.kubernetescrd=true
+      - --providers.kubernetes=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --entrypoints.k8sApi.address=:6443
       - --certificatesresolvers.default.acme.email={{ letsencrypt_email }}
       - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
       - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
@@ -22,7 +21,6 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"
-      - "6443:6443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "{{ traefik_config_dir }}:/etc/traefik"
