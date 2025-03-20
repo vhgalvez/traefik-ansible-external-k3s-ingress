@@ -32,9 +32,11 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
 
 1. **Clonar el Repositorio**:
 
+ 
+
    ```bash
-   git clone https://github.com/vhgalvez/kubernetes-traefik-loadbalancer-docker.git
-   cd kubernetes-traefik-loadbalancer-docker
+   sudo git clone https://github.com/vhgalvez/kubernetes-infra-automation.git
+   cd kubernetes-infra-automation
    ```
 
 2. **Configurar el Inventario**:
