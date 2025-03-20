@@ -28,9 +28,11 @@
         - "/etc/keepalived"
 
     - name: Configurar HAProxy con Health Checks y Timeouts
-      ansible.builtin.template:
-        src: "templates/haproxy.cfg.j2"
-        dest: "{{ haproxy_config_path }}"
+      template:
+        src: ../../templates/haproxy/haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+        owner: root
+        group: root
         mode: "0644"
       notify: Restart HAProxy
 
