@@ -12,9 +12,11 @@ defaults
     timeout client 50s
     timeout server 50s
 
+# 🔹 Balanceo de carga para la API de Kubernetes
 frontend kubernetes_api
     bind *:6443
     mode tcp
+    option tcplog  # 🔹 Corregido: Cambia httplog por tcplog
     default_backend kubernetes_masters
 
 backend kubernetes_masters
@@ -24,6 +26,7 @@ backend kubernetes_masters
     server master-{{ loop.index }} {{ hostvars[host]['ansible_host'] }}:6443 check
 {% endfor %}
 
+# 🔹 Balanceo de tráfico HTTP
 frontend http_traffic
     bind *:80
     default_backend web_servers
@@ -35,6 +38,7 @@ backend web_servers
     server worker-{{ loop.index }} {{ hostvars[host]['ansible_host'] }}:80 check
 {% endfor %}
 
+# 🔹 Balanceo de tráfico HTTPS
 frontend https_traffic
     bind *:443
     default_backend web_servers_ssl
@@ -43,5 +47,5 @@ backend web_servers_ssl
     balance roundrobin
     option ssl-hello-chk
 {% for host in groups['workers'] %}
-    server worker-{{ loop.index }} {{ hostvars[host]['ansible_host'] }}:443 ssl check
+    server worker-{{ loop.index }} {{ hostvars[host]['ansible_host'] }}:443 ssl verify none check  # 🔹 Corregido: Agregado verify none
 {% endfor %}
