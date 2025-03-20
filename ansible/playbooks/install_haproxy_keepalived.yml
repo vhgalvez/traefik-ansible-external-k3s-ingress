@@ -5,7 +5,7 @@
   vars:
     haproxy_config_dir: "/etc/haproxy"
     keepalived_config_dir: "/etc/keepalived"
-    haproxy_config_template: "haproxy/haproxy.cfg.j2"
+    haproxy_config_template: "../../templates/haproxy/haproxy.cfg.j2"
     keepalived_config_template: "keepalived/keepalived.conf.j2"
 
   tasks:
