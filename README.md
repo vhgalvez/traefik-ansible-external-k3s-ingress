@@ -1,4 +1,4 @@
-# Kubernetes Traefik LoadBalancer Docker
+# kubernetes-infra-automation
 
 Este repositorio contiene configuraciones y scripts para implementar y gestionar un balanceador de carga eficiente basado en **Traefik** utilizando **Docker Compose** dentro de un entorno Kubernetes. El objetivo principal es facilitar la instalación y configuración de **Traefik** como proxy inverso y balanceador de carga en un nodo dedicado (`loadbalancer1`), optimizado para gestionar nodos maestros, trabajadores y otros servicios de red.
 
@@ -27,18 +27,6 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    - Ansible instalado en tu máquina de control.
    - Acceso SSH configurado hacia el nodo `loadbalancer1`.
 
-## Estructura del Proyecto
-
-```
-kubernetes-traefik-loadbalancer-docker/
-├── inventory/
-│   └── hosts.ini                # Archivo de inventario para Ansible
-├── templates/
-│   ├── acme.json                # Archivo preconfigurado para Let's Encrypt
-│   ├── docker-compose.yml.j2    # Plantilla para Docker Compose
-│   └── traefik.toml.j2          # Plantilla para la configuración de Traefik
-└── install_traefik.yml          # Playbook principal para configurar Traefik
-```
 
 ## Instalación y Uso
 
