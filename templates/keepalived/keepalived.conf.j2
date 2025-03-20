@@ -1,14 +1,13 @@
 vrrp_instance VI_1 {
     state MASTER
-    interface {{ interface }}
+    interface eth0
     virtual_router_id 51
-    priority {{ priority_lb1 }}  # 🔹 Aquí se usa priority_lb1
+    priority 100
     advert_int 1
     authentication {
         auth_type PASS
-        auth_pass secretpass
+        auth_pass securepassword
     }
     virtual_ipaddress {
-        {{ vip_address }}
-    }
+        10.17.3.10
 }
