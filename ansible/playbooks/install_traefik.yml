@@ -47,7 +47,7 @@
 
     - name: Crear archivo docker-compose para Traefik
       ansible.builtin.template:
-        src: "templates/traefik/docker-compose.yml.j2"
+        src: "../../templates/traefik/docker-compose.yml.j2"
         dest: "{{ docker_compose_file }}"
         mode: "0644"
 
