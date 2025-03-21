@@ -33,6 +33,7 @@
         selfsigned_not_after: "+3650d"
         selfsigned_digest: sha256
         mode: "0644"
+        unsafe_writes: true
         attributes:
           - CN={{ cert_common_name }}
           - O=MyOrg
