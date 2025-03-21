@@ -11,15 +11,12 @@
     [entryPoints.websecure.http.tls]
       certResolver = "default"
 
-  [entryPoints.k8sApi]
-    address = ":6443"
-
 [log]
-  level = "INFO"
+  level = "DEBUG"
 
 [api]
   dashboard = true
-  insecure = false
+  insecure = true
 
 [providers]
   [providers.docker]
@@ -27,10 +24,13 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
+    endpoint = "https://{{ k3s_master_ip }}:6443"
+    token = "/etc/traefik/k3s_token"
+    certAuthFilePath = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
 
   [providers.file]
-    filename = "/etc/traefik/dynamic_conf.toml"
+    directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
 [tls]
