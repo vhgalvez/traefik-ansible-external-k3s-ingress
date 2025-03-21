@@ -39,8 +39,13 @@
         privatekey_path: "{{ certs_dir }}/{{ wildcard_cert_name }}.key"
         csr_path: "{{ certs_dir }}/{{ wildcard_cert_name }}.csr"
         provider: selfsigned
-        subject_alt_name:
-          - "DNS:{{ cert_common_name }}"
+        selfsigned_not_after: "+3650d"
+        subject:
+          common_name: "{{ cert_common_name }}"
+          organization_name: "MyOrg"
+          country_name: "ES"
+          state_or_province_name: "Madrid"
+          locality_name: "Madrid"
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ wildcard_cert_name }}.crt -noout -text"
