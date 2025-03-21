@@ -26,10 +26,7 @@
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
-  [providers.kubernetes]
-    endpoint = "https://{{ k3s_master_ip }}:6443"
-    token = "/etc/traefik/k3s_token"
-    certAuthFilePath = "/etc/traefik/k8s-ca.crt"
+  [providers.kubernetesIngress]
     namespaces = ["default", "traefik"]
 
   [providers.file]
