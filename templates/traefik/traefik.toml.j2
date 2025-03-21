@@ -16,7 +16,7 @@
 
 [api]
   dashboard = true
-  insecure = true  # 🔧 Permitir acceso temporal al dashboard en http://10.17.3.12:8080
+  insecure = true
 
 [providers]
   [providers.docker]
@@ -24,7 +24,7 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    endpoint = "https://{{ k3s_master_ip }}:6443"  # 🔧 Se agrega el endpoint de Kubernetes
+    endpoint = "https://{{ k3s_master_ip }}:6443"
     token = "/etc/traefik/k3s_token"
     certAuthFilePath = "/etc/traefik/k8s-ca.crt"
     namespaces = ["default", "traefik"]
