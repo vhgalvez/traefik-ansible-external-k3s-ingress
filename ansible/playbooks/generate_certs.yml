@@ -39,6 +39,7 @@
       community.crypto.x509_certificate:
         path: "{{ certs_dir }}/{{ cert_common_name }}.crt"
         csr_path: "{{ certs_dir }}/{{ cert_common_name }}.csr"
+        privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"  # <-- Esto es obligatorio
         provider: selfsigned
         selfsigned_not_after: "+3650d"
         selfsigned_digest: "sha256"
