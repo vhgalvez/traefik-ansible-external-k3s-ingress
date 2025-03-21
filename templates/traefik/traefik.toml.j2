@@ -28,12 +28,8 @@
     exposedByDefault = false
 
   [providers.kubernetesCRD]
-    endpoint = "https://{{ k8s_api_vip }}:6443"
+    kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
-    [providers.kubernetesCRD.tls]
-      insecureSkipVerify = true
-    [providers.kubernetesCRD.token]
-      value = "{{ traefik_token }}"
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
