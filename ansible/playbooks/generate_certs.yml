@@ -31,9 +31,12 @@
         privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"
         provider: selfsigned
         selfsigned_not_after: "+3650d"
-        common_name: "{{ cert_common_name }}"
-        organization_name: "MyOrg"
-        subject:
+        selfsigned_digest: "sha256"
+        mode: "0644"
+        unsafe_writes: true
+        selfsigned_subject:
+          common_name: "{{ cert_common_name }}"
+          organization_name: "MyOrg"
           country_name: "ES"
           state_or_province_name: "Madrid"
           locality_name: "Madrid"
