@@ -25,7 +25,7 @@
         size: 2048
         mode: "0600"
 
-    - name: Generar certificado autofirmado sin CSR
+    - name: Generar certificado autofirmado directamente (sin CSR)
       community.crypto.x509_certificate:
         path: "{{ certs_dir }}/wildcard.traefik.local.crt"
         privatekey_path: "{{ certs_dir }}/wildcard.traefik.local.key"
@@ -34,8 +34,9 @@
         common_name: "{{ cert_common_name }}"
         organization_name: "MyOrg"
         subject:
-          locality_name: "Madrid"
           country_name: "ES"
+          state_or_province_name: "Madrid"
+          locality_name: "Madrid"
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/wildcard.traefik.local.crt -noout -text"
