@@ -33,12 +33,12 @@
         selfsigned_not_after: "+3650d"
         selfsigned_digest: sha256
         mode: "0644"
-        subject:
-          commonName: "{{ cert_common_name }}"
-          organizationName: "MyOrg"
-          countryName: "ES"
-          stateOrProvinceName: "Madrid"
-          localityName: "Madrid"
+        attributes:
+          - CN={{ cert_common_name }}
+          - O=MyOrg
+          - C=ES
+          - ST=Madrid
+          - L=Madrid
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ cert_common_name }}.crt -noout -text"
