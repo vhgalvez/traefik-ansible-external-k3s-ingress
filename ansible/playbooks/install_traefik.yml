@@ -19,17 +19,13 @@
         dest: /etc/yum.repos.d/docker-ce.repo
       when: ansible_os_family == "RedHat"
 
-    - name: Instalar Docker CE
+    - name: Instalar Docker CE y plugins
       package:
         name:
           - docker-ce
           - docker-ce-cli
           - containerd.io
-        state: present
-
-    - name: Instalar Docker Compose plugin
-      package:
-        name: docker-compose-plugin
+          - docker-compose-plugin
         state: present
 
     - name: Habilitar e iniciar Docker
@@ -97,7 +93,7 @@
 
     - name: Reiniciar contenedor Traefik
       shell: |
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash

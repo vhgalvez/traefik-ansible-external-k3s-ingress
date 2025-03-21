@@ -24,8 +24,7 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    endpoint = "https://{{ k8s_api_vip }}:6443"
-    token = "{{ traefik_token }}"
+    kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
 
   [providers.file]
