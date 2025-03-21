@@ -1,64 +1,88 @@
----
 - name: Instalar y Configurar Traefik como Ingress Controller en Docker
   hosts: load_balancers
   become: true
 
   vars:
-    traefik_namespace: kube-system
-    traefik_serviceaccount: traefik-ingress-controller
-    k8s_api_vip: 10.17.5.10
-    traefik_domain: "cefaslocalserver.com"
-    letsencrypt_email: "youremail@example.com"
+    traefik_config_dir: "/etc/traefik"
+    traefik_home_tmp: "/tmp/kubeconfig"
+    k8s_api_vip: "10.17.5.10"
 
   tasks:
 
-    - name: Instalar dependencias
+    - name: Instalar dependencias (solo para AlmaLinux)
       package:
-        name:
-          - curl
-          - jq
+        name: ['docker', 'docker-compose']
         state: present
+      when: ansible_os_family == "RedHat"
 
     - name: Crear directorio de configuración de Traefik
       file:
-        path: /etc/traefik
+        path: "{{ traefik_config_dir }}"
         state: directory
-        mode: '0755'
+        mode: "0755"
 
-    - name: Crear ServiceAccount para Traefik
-      delegate_to: "{{ groups['masters'][0] }}"
+    - name: Crear ServiceAccount y ClusterRoleBinding para Traefik (solo en localhost)
+      delegate_to: localhost
+      run_once: true
+      become: false
       shell: |
-        kubectl -n {{ traefik_namespace }} create serviceaccount {{ traefik_serviceaccount }} || true
-        kubectl create clusterrolebinding {{ traefik_serviceaccount }} \
-          --clusterrole=cluster-admin \
-          --serviceaccount={{ traefik_namespace }}:{{ traefik_serviceaccount }} || true
+        kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Obtener token del ServiceAccount
-      delegate_to: "{{ groups['masters'][0] }}"
+    - name: Obtener token para Traefik (solo en localhost)
+      delegate_to: localhost
+      run_once: true
+      become: false
       shell: |
-        TOKEN_NAME=$(kubectl -n {{ traefik_namespace }} get sa/{{ traefik_serviceaccount }} -o jsonpath='{.secrets[0].name}')
-        kubectl -n {{ traefik_namespace }} get secret "$TOKEN_NAME" -o jsonpath='{.data.token}' | base64 -d
-      register: traefik_sa_token
+        TOKEN_NAME=$(kubectl -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
+        kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
+      register: traefik_token_result
 
-    - name: Crear archivo traefik.toml
+    - name: Copiar kubeconfig al home temporalmente
+      delegate_to: localhost
+      run_once: true
+      copy:
+        src: "~/.kube/config"
+        dest: "{{ traefik_home_tmp }}"
+        mode: "0644"
+
+    - name: Copiar kubeconfig a nodos Traefik
+      copy:
+        src: "{{ traefik_home_tmp }}"
+        dest: "{{ traefik_config_dir }}/kubeconfig"
+        mode: "0644"
+
+    - name: Crear archivo acme.json
+      copy:
+        dest: "{{ traefik_config_dir }}/acme.json"
+        content: "{}"
+        mode: "0600"
+
+    - name: Crear archivo traefik.toml con el token obtenido
       template:
-        src: templates/traefik/traefik.toml.j2
-        dest: /etc/traefik/traefik.toml
-        mode: '0644'
+        src: "traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
       vars:
-        traefik_token: "{{ traefik_sa_token.stdout }}"
-        k8s_api_vip: "{{ k8s_api_vip }}"
+        traefik_token: "{{ traefik_token_result.stdout }}"
 
     - name: Crear archivo docker-compose.yml
       template:
-        src: templates/traefik/docker-compose.yml.j2
-        dest: /etc/traefik/docker-compose.yml
-        mode: '0644'
+        src: "traefik/docker-compose.yml.j2"
+        dest: "{{ traefik_config_dir }}/docker-compose.yml"
+        mode: "0644"
 
-    - name: Reiniciar Traefik con Docker Compose
+    - name: Reiniciar contenedor Traefik
       shell: |
-        cd /etc/traefik
-        docker compose down || true
-        docker compose up -d
+        docker-compose -f {{ traefik_config_dir }}/docker-compose.yml down
+        docker-compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
+
+    - name: Verificar estado de Traefik
+      shell: docker ps -a | grep traefik
+      register: traefik_status
+
+    - name: Mostrar resultado
+      debug:
+        msg: "{{ traefik_status.stdout_lines }}"

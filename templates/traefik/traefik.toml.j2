@@ -27,7 +27,6 @@
     endpoint = "https://{{ k8s_api_vip }}:6443"
     token = "{{ traefik_token }}"
     namespaces = ["default", "traefik"]
-    insecureSkipTLSVerify = true
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
