@@ -9,28 +9,27 @@
     traefik_domain: "{{ traefik_domain }}"
     letsencrypt_email: "{{ letsencrypt_email }}"
     docker_compose_file: "{{ traefik_config_dir }}/docker-compose.yml"
-    kubeconfig_tmp_local: "/tmp/kubeconfig_from_master1.yaml"
-
-  pre_tasks:
-    - name: Obtener kubeconfig del nodo master en el controlador (solo se ejecuta en localhost)
-      delegate_to: localhost
-      run_once: true
-      become: false
-      ansible.builtin.shell: |
-        ssh -o StrictHostKeyChecking=no -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift core@10.17.4.21 'sudo cat /etc/rancher/k3s/k3s.yaml' > {{ kubeconfig_tmp_local }}
-      args:
-        executable: /bin/bash
-
-    - name: Modificar el endpoint del servidor API para que apunte al VIP
-      delegate_to: localhost
-      become: false
-      run_once: true
-      ansible.builtin.replace:
-        path: "{{ kubeconfig_tmp_local }}"
-        regexp: 'server: https://127.0.0.1:6443'
-        replace: 'server: https://10.17.5.10:6443'
+    traefik_kubeconfig_path: "{{ traefik_config_dir }}/kubeconfig"
+    kubeconfig_local_tmp: "/tmp/kubeconfig_from_master1.yaml"
+    master_node_ip: "10.17.4.21"
 
   tasks:
+    - name: Obtener kubeconfig del nodo master en el controlador (solo se ejecuta en localhost)
+      ansible.builtin.shell: |
+        ssh -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
+        -o StrictHostKeyChecking=no core@{{ master_node_ip }} \
+        'sudo cat /etc/rancher/k3s/k3s.yaml' > {{ kubeconfig_local_tmp }}
+      delegate_to: localhost
+      run_once: true
+
+    - name: Modificar el endpoint del servidor API para que apunte al VIP
+      ansible.builtin.replace:
+        path: "{{ kubeconfig_local_tmp }}"
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: 'server: https://10.17.5.10:6443'
+      delegate_to: localhost
+      run_once: true
+
     - name: Verificar si Docker está instalado
       ansible.builtin.command: "docker -v"
       register: docker_installed
@@ -48,11 +47,16 @@
         state: directory
         mode: "0755"
 
-    - name: Copiar kubeconfig desde localhost al nodo
+    - name: Copiar kubeconfig a ubicación temporal en el nodo remoto
       ansible.builtin.shell: |
-        scp -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift -o StrictHostKeyChecking=no {{ kubeconfig_tmp_local }} core@{{ inventory_hostname }}:{{ traefik_config_dir }}/kubeconfig
+        scp -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
+        -o StrictHostKeyChecking=no {{ kubeconfig_local_tmp }} core@{{ inventory_hostname }}:/home/core/kubeconfig_temp
       delegate_to: localhost
-      run_once: false
+
+    - name: Mover kubeconfig a /etc/traefik con permisos de root
+      ansible.builtin.shell: |
+        mv /home/core/kubeconfig_temp {{ traefik_kubeconfig_path }} && chmod 600 {{ traefik_kubeconfig_path }}
+      become: true
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
