@@ -21,26 +21,30 @@
 
     - name: Generar clave privada
       community.crypto.openssl_privatekey:
-        path: "{{ certs_dir }}/traefik.key"
+        path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.key"
         size: 2048
         mode: "0600"
 
     - name: Generar solicitud de certificado (CSR)
       community.crypto.openssl_csr:
-        path: "{{ certs_dir }}/traefik.csr"
-        privatekey_path: "{{ certs_dir }}/traefik.key"
-        common_name: "{{ cert_common_name }}"
+        path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.csr"
+        privatekey_path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.key"
+        common_name: "*.{{ cert_common_name }}"
         organization_name: "MyOrg"
 
     - name: Generar certificado autofirmado
       community.crypto.x509_certificate:
-        path: "{{ certs_dir }}/traefik.crt"
-        privatekey_path: "{{ certs_dir }}/traefik.key"
-        csr_path: "{{ certs_dir }}/traefik.csr"
+        path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.crt"
+        privatekey_path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.key"
+        csr_path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.csr"
         provider: selfsigned
+        attributes:
+          subject_alt_name:
+            - "DNS:*.{{ cert_common_name }}"
+            - "DNS:{{ cert_common_name }}"
 
     - name: Mostrar detalles del certificado generado
-      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/traefik.crt -noout -text"
+      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/wildcard.{{ cert_common_name }}.crt -noout -text"
       register: cert_info
       changed_when: false
 
