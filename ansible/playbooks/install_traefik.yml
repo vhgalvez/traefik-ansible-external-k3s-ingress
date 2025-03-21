@@ -5,6 +5,8 @@
   vars:
     traefik_config_dir: "/etc/traefik"
     traefik_home_tmp: "/tmp/kubeconfig"
+    traefik_kubeconfig_from_master: "/etc/rancher/k3s/k3s.yaml"
+    k3s_master_ip: "10.17.4.21"
     k8s_api_vip: "10.17.5.10"
 
   tasks:
@@ -40,30 +42,44 @@
         state: directory
         mode: "0755"
 
-    - name: Crear ServiceAccount y ClusterRoleBinding para Traefik (solo en localhost)
+    # Copiamos el kubeconfig desde master1 al controlador (localhost)
+    - name: Obtener kubeconfig actualizado desde master1
+      fetch:
+        src: "{{ traefik_kubeconfig_from_master }}"
+        dest: "{{ traefik_home_tmp }}"
+        flat: yes
+      delegate_to: "{{ k3s_master_ip }}"
+      run_once: true
+
+    - name: Reemplazar 127.0.0.1 por VIP en kubeconfig
       delegate_to: localhost
       run_once: true
       become: false
+      replace:
+        path: "{{ traefik_home_tmp }}"
+        regexp: '127.0.0.1'
+        replace: "{{ k8s_api_vip }}"
+
+    - name: Crear ServiceAccount y ClusterRoleBinding para Traefik
+      delegate_to: localhost
+      run_once: true
+      become: false
+      environment:
+        KUBECONFIG: "{{ traefik_home_tmp }}"
       shell: |
         kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
         kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Obtener token para Traefik (solo en localhost)
+    - name: Obtener token para Traefik
       delegate_to: localhost
       run_once: true
       become: false
+      environment:
+        KUBECONFIG: "{{ traefik_home_tmp }}"
       shell: |
         TOKEN_NAME=$(kubectl -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
         kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
       register: traefik_token_result
-
-    - name: Copiar kubeconfig al home temporalmente (solo en localhost)
-      delegate_to: localhost
-      run_once: true
-      copy:
-        src: "~/.kube/config"
-        dest: "{{ traefik_home_tmp }}"
-        mode: "0644"
 
     - name: Copiar kubeconfig a nodos Traefik
       copy:
@@ -77,7 +93,7 @@
         content: "{}"
         mode: "0600"
 
-    - name: Crear archivo traefik.toml con el token obtenido
+    - name: Crear archivo traefik.toml con el token
       template:
         src: "traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
@@ -102,6 +118,6 @@
       shell: docker ps -a | grep traefik
       register: traefik_status
 
-    - name: Mostrar resultado
+    - name: Mostrar estado
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
