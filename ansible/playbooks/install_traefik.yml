@@ -8,22 +8,24 @@
     k8s_api_vip: "10.17.5.10"
 
   tasks:
-
     - name: Eliminar conflictos con Podman
       package:
-        name: ['podman', 'podman-docker']
+        name: podman-docker
         state: absent
 
     - name: Añadir repo oficial Docker CE (solo AlmaLinux/RHEL/CentOS)
-      shell: |
-        dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-      args:
-        creates: /etc/yum.repos.d/docker-ce.repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+      when: ansible_os_family == "RedHat"
 
     - name: Instalar Docker CE
       package:
-        name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
-        state: latest
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
 
     - name: Instalar Docker Compose plugin
       package:
@@ -33,8 +35,8 @@
     - name: Habilitar e iniciar Docker
       systemd:
         name: docker
-        state: started
         enabled: yes
+        state: started
 
     - name: Crear directorio de configuración de Traefik
       file:
@@ -59,7 +61,7 @@
         kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
       register: traefik_token_result
 
-    - name: Copiar kubeconfig al home temporalmente
+    - name: Copiar kubeconfig al home temporalmente (solo en localhost)
       delegate_to: localhost
       run_once: true
       copy:
