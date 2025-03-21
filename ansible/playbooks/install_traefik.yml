@@ -3,7 +3,7 @@
   hosts: load_balancers
   become: true
   vars:
-    traefik_image: "traefik:v2.10"
+    traefik_image: "traefik:v3.3"
     traefik_container_name: "traefik"
     traefik_config_dir: "/etc/traefik"
     traefik_domain: "traefik.local"
