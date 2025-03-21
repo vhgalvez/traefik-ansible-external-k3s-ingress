@@ -6,10 +6,10 @@
     traefik_image: "traefik:v3.3"
     traefik_container_name: "traefik"
     traefik_config_dir: "/etc/traefik"
-    traefik_domain: "traefik.local"
-    letsencrypt_email: "tu-email@dominio.com"
-    docker_compose_file: "/etc/traefik/docker-compose.yml"
-    traefik_kubeconfig_dest: "{{ traefik_config_dir }}/kubeconfig"
+    traefik_domain: "{{ traefik_domain }}"
+    letsencrypt_email: "{{ letsencrypt_email }}"
+    docker_compose_file: "{{ traefik_config_dir }}/docker-compose.yml"
+    traefik_kubeconfig_path: "{{ traefik_config_dir }}/kubeconfig"
 
   tasks:
     - name: Verificar si Docker está instalado
@@ -17,25 +17,6 @@
       register: docker_installed
       ignore_errors: yes
       changed_when: false
-
-    - name: Obtener kubeconfig desde master1 (por IP directa del grupo masters)
-      ansible.builtin.fetch:
-        src: /etc/rancher/k3s/k3s.yaml
-        dest: /tmp/kubeconfig
-        flat: true
-      delegate_to: "{{ groups['masters'] | first }}"
-
-    - name: Copiar kubeconfig al nodo Traefik
-      ansible.builtin.copy:
-        src: "/tmp/kubeconfig"
-        dest: "{{ traefik_kubeconfig_dest }}"
-        mode: "0600"
-
-    - name: Validar que el kubeconfig contiene acceso al VIP del API
-      ansible.builtin.lineinfile:
-        path: "{{ traefik_kubeconfig_dest }}"
-        regexp: '^\s*server:'
-        line: '    server: https://10.17.5.10:6443'
 
     - name: Instalar Docker si no está instalado
       ansible.builtin.shell: |
@@ -48,47 +29,61 @@
         state: directory
         mode: "0755"
 
-    - name: Crear archivo de configuración de Traefik
-      ansible.builtin.template:
-        src: "../../templates/traefik/traefik.toml.j2"
-        dest: "{{ traefik_config_dir }}/traefik.toml"
-        mode: "0644"
+    - name: Copiar kubeconfig desde el nodo master al controlador (localhost)
+      ansible.builtin.fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: /tmp/kubeconfig_from_master1.yaml
+        flat: yes
+      delegate_to: 10.17.4.21
+      become: true
 
-    - name: Crear archivo acme.json para certificados SSL
+    - name: Modificar la IP del servidor API en kubeconfig (VIP del HAProxy)
+      ansible.builtin.replace:
+        path: /tmp/kubeconfig_from_master1.yaml
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: 'server: https://10.17.5.10:6443'
+      delegate_to: localhost
+
+    - name: Copiar kubeconfig a los nodos Traefik
+      ansible.builtin.copy:
+        src: /tmp/kubeconfig_from_master1.yaml
+        dest: "{{ traefik_kubeconfig_path }}"
+        mode: "0600"
+
+    - name: Crear archivo acme.json
       ansible.builtin.file:
         path: "{{ traefik_config_dir }}/acme.json"
         state: touch
         mode: "0600"
 
-    - name: Asegurar que el archivo acme.json tenga los permisos correctos
-      ansible.builtin.file:
-        path: "{{ traefik_config_dir }}/acme.json"
-        mode: "0600"
+    - name: Crear archivo traefik.toml
+      ansible.builtin.template:
+        src: "../../templates/traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
 
-    - name: Crear archivo docker-compose para Traefik
+    - name: Crear archivo docker-compose.yml
       ansible.builtin.template:
         src: "../../templates/traefik/docker-compose.yml.j2"
         dest: "{{ docker_compose_file }}"
         mode: "0644"
 
-    - name: Detener y eliminar cualquier contenedor Traefik existente
-      ansible.builtin.shell: |
-        docker-compose -f {{ docker_compose_file }} down
+    - name: Detener cualquier contenedor Traefik anterior
+      ansible.builtin.shell: docker-compose down || true
       args:
         chdir: "{{ traefik_config_dir }}"
       ignore_errors: yes
 
-    - name: Iniciar Traefik con Docker Compose
-      ansible.builtin.shell: |
-        docker-compose -f {{ docker_compose_file }} up -d
+    - name: Iniciar Traefik
+      ansible.builtin.shell: docker-compose up -d
       args:
         chdir: "{{ traefik_config_dir }}"
 
-    - name: Verificar si Traefik está corriendo
-      ansible.builtin.command: "docker ps -f name={{ traefik_container_name }}"
+    - name: Verificar estado de Traefik
+      ansible.builtin.command: docker ps -f name={{ traefik_container_name }}
       register: traefik_status
       changed_when: false
 
-    - name: Mostrar estado de Traefik
+    - name: Mostrar resultado
       ansible.builtin.debug:
         msg: "{{ traefik_status.stdout_lines }}"
