@@ -24,8 +24,10 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    kubeconfig = "/etc/traefik/kubeconfig"
+    endpoint = "https://10.17.5.10:6443"
+    token = "<tu-token-de-acceso>"
     namespaces = ["default", "traefik"]
+    insecureSkipTLSVerify = true
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
