@@ -31,6 +31,7 @@
         privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"
         provider: selfsigned
         selfsigned_not_after: "+3650d"
+        unsafe_writes: true
         attributes:
           common_name: "{{ cert_common_name }}"
           organization_name: "MyOrg"
