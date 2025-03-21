@@ -9,11 +9,32 @@
 
   tasks:
 
-    - name: Instalar dependencias (solo para AlmaLinux)
+    - name: Eliminar conflictos con Podman
       package:
-        name: ['docker', 'docker-compose']
+        name: ['podman', 'podman-docker']
+        state: absent
+
+    - name: Añadir repo oficial Docker CE (solo AlmaLinux/RHEL/CentOS)
+      shell: |
+        dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+    - name: Instalar Docker CE
+      package:
+        name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
+        state: latest
+
+    - name: Instalar Docker Compose plugin
+      package:
+        name: docker-compose-plugin
         state: present
-      when: ansible_os_family == "RedHat"
+
+    - name: Habilitar e iniciar Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
 
     - name: Crear directorio de configuración de Traefik
       file:
@@ -74,8 +95,8 @@
 
     - name: Reiniciar contenedor Traefik
       shell: |
-        docker-compose -f {{ traefik_config_dir }}/docker-compose.yml down
-        docker-compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
 
