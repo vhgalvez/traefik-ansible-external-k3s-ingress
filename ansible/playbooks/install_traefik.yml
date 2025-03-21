@@ -1,13 +1,13 @@
+---
 - name: Instalar y Configurar Traefik como Ingress Controller en Docker
   hosts: load_balancers
   become: true
 
   vars:
     traefik_config_dir: "/etc/traefik"
-    traefik_home_tmp: "/tmp/kubeconfig"
-    traefik_kubeconfig_from_master: "/etc/rancher/k3s/k3s.yaml"
-    k3s_master_ip: "10.17.4.21"
     k8s_api_vip: "10.17.5.10"
+    kubeconfig_local_path: "/tmp/kubeconfig-traefik"
+    kubeconfig_remote_path: "/etc/traefik/kubeconfig"
 
   tasks:
     - name: Eliminar conflictos con Podman
@@ -42,49 +42,35 @@
         state: directory
         mode: "0755"
 
-    # Copiamos el kubeconfig desde master1 al controlador (localhost)
-    - name: Obtener kubeconfig actualizado desde master1
-      fetch:
-        src: "{{ traefik_kubeconfig_from_master }}"
-        dest: "{{ traefik_home_tmp }}"
-        flat: yes
-      delegate_to: "{{ k3s_master_ip }}"
-      run_once: true
-
-    - name: Reemplazar 127.0.0.1 por VIP en kubeconfig
+    - name: Crear ServiceAccount y ClusterRoleBinding para Traefik (solo en localhost)
       delegate_to: localhost
       run_once: true
       become: false
-      replace:
-        path: "{{ traefik_home_tmp }}"
-        regexp: '127.0.0.1'
-        replace: "{{ k8s_api_vip }}"
-
-    - name: Crear ServiceAccount y ClusterRoleBinding para Traefik
-      delegate_to: localhost
-      run_once: true
-      become: false
-      environment:
-        KUBECONFIG: "{{ traefik_home_tmp }}"
       shell: |
         kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
         kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Obtener token para Traefik
+    - name: Obtener token para Traefik (solo en localhost)
       delegate_to: localhost
       run_once: true
       become: false
-      environment:
-        KUBECONFIG: "{{ traefik_home_tmp }}"
       shell: |
         TOKEN_NAME=$(kubectl -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
         kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
       register: traefik_token_result
 
+    - name: Copiar kubeconfig desde el master1 a localhost (sin requerir Python en nodos Flatcar)
+      delegate_to: localhost
+      run_once: true
+      become: false
+      shell: |
+        scp -o StrictHostKeyChecking=no -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
+        core@10.17.4.21:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_local_path }}
+
     - name: Copiar kubeconfig a nodos Traefik
       copy:
-        src: "{{ traefik_home_tmp }}"
-        dest: "{{ traefik_config_dir }}/kubeconfig"
+        src: "{{ kubeconfig_local_path }}"
+        dest: "{{ kubeconfig_remote_path }}"
         mode: "0644"
 
     - name: Crear archivo acme.json
@@ -93,7 +79,7 @@
         content: "{}"
         mode: "0600"
 
-    - name: Crear archivo traefik.toml con el token
+    - name: Crear archivo traefik.toml con el token obtenido
       template:
         src: "traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
@@ -109,7 +95,7 @@
 
     - name: Reiniciar contenedor Traefik
       shell: |
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
@@ -118,6 +104,6 @@
       shell: docker ps -a | grep traefik
       register: traefik_status
 
-    - name: Mostrar estado
+    - name: Mostrar resultado
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
