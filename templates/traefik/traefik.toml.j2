@@ -1,3 +1,14 @@
+[global]
+  checkNewVersion = true
+  sendAnonymousUsage = false
+
+[log]
+  level = "DEBUG"
+
+[api]
+  dashboard = true
+  insecure = true
+
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -11,20 +22,16 @@
     [entryPoints.websecure.http.tls]
       certResolver = "default"
 
-[log]
-  level = "DEBUG"
-
-[api]
-  dashboard = true
-  insecure = true
-
 [providers]
+
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
-  [providers.kubernetesIngress]
-    kubeconfig = "/etc/traefik/kubeconfig"
+  [providers.kubernetesCRD]
+    endpoint = "https://{{ k8s_api_vip }}:6443"
+    token = "{{ traefik_token }}"
+    insecureSkipTLSVerify = true
     namespaces = ["default", "traefik"]
 
   [providers.file]
