@@ -27,7 +27,7 @@
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
-  [providers.kubernetesCRD]
+  [providers.kubernetesIngress]
     kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
 
