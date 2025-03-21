@@ -90,7 +90,7 @@
 
     - name: Crear archivo traefik.toml con token
       template:
-        src: "traefik/traefik.toml.j2"
+        src: "../../templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
       vars:
@@ -98,7 +98,7 @@
 
     - name: Crear archivo docker-compose.yml
       template:
-        src: "traefik/docker-compose.yml.j2"
+        src: "../../templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
