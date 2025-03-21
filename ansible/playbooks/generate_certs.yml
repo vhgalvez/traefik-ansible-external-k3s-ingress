@@ -4,7 +4,8 @@
   become: true
   vars:
     certs_dir: "/etc/traefik/certs"
-    cert_common_name: "*.traefik.local"
+    cert_common_name: "traefik.local"
+    cert_name: "traefik.local"
 
   tasks:
     - name: Asegurar que la biblioteca cryptography esté instalada
@@ -21,25 +22,27 @@
 
     - name: Generar clave privada
       community.crypto.openssl_privatekey:
-        path: "{{ certs_dir }}/wildcard.traefik.local.key"
+        path: "{{ certs_dir }}/{{ cert_name }}.key"
         size: 2048
         mode: "0600"
 
-    - name: Generar certificado autofirmado directamente (sin CSR)
-      community.crypto.x509_certificate:
-        path: "{{ certs_dir }}/wildcard.traefik.local.crt"
-        privatekey_path: "{{ certs_dir }}/wildcard.traefik.local.key"
-        provider: selfsigned
-        selfsigned_not_after: "+3650d"
+    - name: Generar solicitud de certificado (CSR)
+      community.crypto.openssl_csr:
+        path: "{{ certs_dir }}/{{ cert_name }}.csr"
+        privatekey_path: "{{ certs_dir }}/{{ cert_name }}.key"
         common_name: "{{ cert_common_name }}"
         organization_name: "MyOrg"
-        subject:
-          country_name: "ES"
-          state_or_province_name: "Madrid"
-          locality_name: "Madrid"
+
+    - name: Generar certificado autofirmado
+      community.crypto.x509_certificate:
+        path: "{{ certs_dir }}/{{ cert_name }}.crt"
+        privatekey_path: "{{ certs_dir }}/{{ cert_name }}.key"
+        csr_path: "{{ certs_dir }}/{{ cert_name }}.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+3650d"
 
     - name: Mostrar detalles del certificado generado
-      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/wildcard.traefik.local.crt -noout -text"
+      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ cert_name }}.crt -noout -text"
       register: cert_info
       changed_when: false
 
