@@ -38,10 +38,7 @@
         privatekey_path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.key"
         csr_path: "{{ certs_dir }}/wildcard.{{ cert_common_name }}.csr"
         provider: selfsigned
-        attributes:
-          subject_alt_name:
-            - "DNS:*.{{ cert_common_name }}"
-            - "DNS:{{ cert_common_name }}"
+        selfsigned_not_after: "+3650d"
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/wildcard.{{ cert_common_name }}.crt -noout -text"
