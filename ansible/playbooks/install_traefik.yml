@@ -47,15 +47,16 @@
         state: directory
         mode: "0755"
 
-    - name: Copiar kubeconfig temporalmente al home del usuario core
+    - name: Copiar kubeconfig al home temporalmente
       delegate_to: localhost
       ansible.builtin.shell: |
         scp -i {{ ssh_key_path }} -o StrictHostKeyChecking=no {{ kubeconfig_local_tmp }} core@{{ inventory_hostname }}:/home/core/kubeconfig_temp
 
-    - name: Mover kubeconfig al destino final con permisos de root
+    - name: Mover kubeconfig a /etc/traefik con permisos correctos
       ansible.builtin.shell: |
-        mv /home/core/kubeconfig_temp {{ traefik_kubeconfig_path }} && chmod 600 {{ traefik_kubeconfig_path }}
-      become: true
+        sudo mv /home/core/kubeconfig_temp {{ traefik_kubeconfig_path }} && sudo chmod 600 {{ traefik_kubeconfig_path }}
+      delegate_to: "{{ inventory_hostname }}"
+      become: false  # sudo ya se está usando explícitamente en el comando
 
     - name: Crear archivo acme.json
       ansible.builtin.file:
