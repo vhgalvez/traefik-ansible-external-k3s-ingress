@@ -25,21 +25,25 @@
         size: 2048
         mode: "0600"
 
-    - name: Generar certificado autofirmado directamente (sin CSR)
+    - name: Generar CSR (Certificate Signing Request)
+      community.crypto.openssl_csr:
+        path: "{{ certs_dir }}/{{ cert_common_name }}.csr"
+        privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"
+        common_name: "{{ cert_common_name }}"
+        organization_name: "MyOrg"
+        country_name: "ES"
+        state_or_province_name: "Madrid"
+        locality_name: "Madrid"
+
+    - name: Generar certificado autofirmado desde el CSR
       community.crypto.x509_certificate:
         path: "{{ certs_dir }}/{{ cert_common_name }}.crt"
-        privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"
+        csr_path: "{{ certs_dir }}/{{ cert_common_name }}.csr"
         provider: selfsigned
         selfsigned_not_after: "+3650d"
         selfsigned_digest: "sha256"
         mode: "0644"
         unsafe_writes: true
-        selfsigned_subject:
-          common_name: "{{ cert_common_name }}"
-          organization_name: "MyOrg"
-          country_name: "ES"
-          state_or_province_name: "Madrid"
-          locality_name: "Madrid"
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ cert_common_name }}.crt -noout -text"
