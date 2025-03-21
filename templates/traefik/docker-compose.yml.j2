@@ -17,6 +17,7 @@ services:
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --entrypoints.websecure.http.tls=true
+      - --providers.kubernetesingress.kubeconfig=/etc/traefik/kubeconfig
     ports:
       - "80:80"
       - "443:443"

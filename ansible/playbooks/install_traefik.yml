@@ -9,6 +9,8 @@
     traefik_domain: "traefik.local"
     letsencrypt_email: "tu-email@dominio.com"
     docker_compose_file: "/etc/traefik/docker-compose.yml"
+    traefik_kubeconfig_src: "/home/victory/.kube/config"
+    traefik_kubeconfig_dest: "{{ traefik_config_dir }}/kubeconfig"
 
   tasks:
     - name: Verificar si Docker está instalado
@@ -27,6 +29,18 @@
         path: "{{ traefik_config_dir }}"
         state: directory
         mode: "0755"
+
+    - name: Copiar kubeconfig para Traefik
+      ansible.builtin.copy:
+        src: "{{ traefik_kubeconfig_src }}"
+        dest: "{{ traefik_kubeconfig_dest }}"
+        mode: "0600"
+
+    - name: Validar que el kubeconfig contiene acceso al VIP del API
+      ansible.builtin.lineinfile:
+        path: "{{ traefik_kubeconfig_dest }}"
+        regexp: '^ *server:'
+        line: '    server: https://10.17.5.10:6443'
 
     - name: Crear archivo de configuración de Traefik
       ansible.builtin.template:
