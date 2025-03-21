@@ -12,28 +12,28 @@
     traefik_kubeconfig_path: "{{ traefik_config_dir }}/kubeconfig"
     kubeconfig_local_tmp: "/tmp/kubeconfig_from_master1.yaml"
     master_node_ip: "10.17.4.21"
+    ssh_key_path: "/root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift"
 
   tasks:
     - name: Obtener kubeconfig del nodo master en el controlador (solo se ejecuta en localhost)
-      ansible.builtin.shell: |
-        ssh -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
-        -o StrictHostKeyChecking=no core@{{ master_node_ip }} \
-        'sudo cat /etc/rancher/k3s/k3s.yaml' > {{ kubeconfig_local_tmp }}
       delegate_to: localhost
       run_once: true
+      ansible.builtin.shell: |
+        ssh -i {{ ssh_key_path }} -o StrictHostKeyChecking=no core@{{ master_node_ip }} \
+        'sudo cat /etc/rancher/k3s/k3s.yaml' > {{ kubeconfig_local_tmp }}
 
     - name: Modificar el endpoint del servidor API para que apunte al VIP
+      delegate_to: localhost
+      run_once: true
       ansible.builtin.replace:
         path: "{{ kubeconfig_local_tmp }}"
         regexp: 'server: https://127.0.0.1:6443'
         replace: 'server: https://10.17.5.10:6443'
-      delegate_to: localhost
-      run_once: true
 
     - name: Verificar si Docker está instalado
       ansible.builtin.command: "docker -v"
       register: docker_installed
-      ignore_errors: yes
+      ignore_errors: true
       changed_when: false
 
     - name: Instalar Docker si no está instalado
@@ -47,13 +47,12 @@
         state: directory
         mode: "0755"
 
-    - name: Copiar kubeconfig a ubicación temporal en el nodo remoto
-      ansible.builtin.shell: |
-        scp -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
-        -o StrictHostKeyChecking=no {{ kubeconfig_local_tmp }} core@{{ inventory_hostname }}:/home/core/kubeconfig_temp
+    - name: Copiar kubeconfig temporalmente al home del usuario core
       delegate_to: localhost
+      ansible.builtin.shell: |
+        scp -i {{ ssh_key_path }} -o StrictHostKeyChecking=no {{ kubeconfig_local_tmp }} core@{{ inventory_hostname }}:/home/core/kubeconfig_temp
 
-    - name: Mover kubeconfig a /etc/traefik con permisos de root
+    - name: Mover kubeconfig al destino final con permisos de root
       ansible.builtin.shell: |
         mv /home/core/kubeconfig_temp {{ traefik_kubeconfig_path }} && chmod 600 {{ traefik_kubeconfig_path }}
       become: true
@@ -80,7 +79,7 @@
       ansible.builtin.shell: docker-compose down || true
       args:
         chdir: "{{ traefik_config_dir }}"
-      ignore_errors: yes
+      ignore_errors: true
 
     - name: Iniciar Traefik
       ansible.builtin.shell: docker-compose up -d
