@@ -9,10 +9,27 @@
     traefik_domain: "traefik.local"
     letsencrypt_email: "tu-email@dominio.com"
     docker_compose_file: "/etc/traefik/docker-compose.yml"
-    traefik_kubeconfig_src: "/home/victory/.kube/config"
-    traefik_kubeconfig_dest: "{{ traefik_config_dir }}/kubeconfig"
+    kubeconfig_temp_path: "/tmp/k3s.yaml"
 
   tasks:
+    - name: Obtener kubeconfig desde master1
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      delegate_to: master1.cefaslocalserver.com
+      register: k3s_kubeconfig_raw
+
+    - name: Guardar kubeconfig en archivo local
+      ansible.builtin.copy:
+        dest: "{{ kubeconfig_temp_path }}"
+        content: "{{ k3s_kubeconfig_raw['content'] | b64decode }}"
+        mode: '0600'
+
+    - name: Reemplazar server en kubeconfig con VIP
+      ansible.builtin.replace:
+        path: "{{ kubeconfig_temp_path }}"
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: 'server: https://10.17.5.10:6443'
+
     - name: Verificar si Docker está instalado
       ansible.builtin.command: "docker -v"
       register: docker_installed
@@ -30,17 +47,11 @@
         state: directory
         mode: "0755"
 
-    - name: Copiar kubeconfig para Traefik
+    - name: Copiar kubeconfig al host de Traefik
       ansible.builtin.copy:
-        src: "{{ traefik_kubeconfig_src }}"
-        dest: "{{ traefik_kubeconfig_dest }}"
+        src: "{{ kubeconfig_temp_path }}"
+        dest: "{{ traefik_config_dir }}/kubeconfig"
         mode: "0600"
-
-    - name: Validar que el kubeconfig contiene acceso al VIP del API
-      ansible.builtin.lineinfile:
-        path: "{{ traefik_kubeconfig_dest }}"
-        regexp: '^ *server:'
-        line: '    server: https://10.17.5.10:6443'
 
     - name: Crear archivo de configuración de Traefik
       ansible.builtin.template:
