@@ -50,6 +50,15 @@
         scp -o StrictHostKeyChecking=no -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
         core@10.17.4.21:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_local_path }}
 
+    - name: Reemplazar IP local por el VIP en kubeconfig
+      delegate_to: localhost
+      run_once: true
+      become: false
+      replace:
+        path: "{{ kubeconfig_local_path }}"
+        regexp: 'https://127.0.0.1:6443'
+        replace: "https://{{ k8s_api_vip }}:6443"
+
     - name: Crear ServiceAccount y ClusterRoleBinding usando kubeconfig
       delegate_to: localhost
       run_once: true
