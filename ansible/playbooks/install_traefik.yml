@@ -1,57 +1,97 @@
 ---
-- name: Generar certificados SSL para Traefik
+- name: Instalar y Configurar Traefik como Ingress Controller en Docker
   hosts: load_balancers
   become: true
   vars:
-    certs_dir: "/etc/traefik/certs"
-    cert_common_name: "traefik.local"
-    wildcard_cert_name: "wildcard.traefik.local"
+    traefik_image: "traefik:v3.3"
+    traefik_container_name: "traefik"
+    traefik_config_dir: "/etc/traefik"
+      # traefik_domain: "{{ traefik_domain }}"
+      # letsencrypt_email: "{{ letsencrypt_email }}"
+    docker_compose_file: "{{ traefik_config_dir }}/docker-compose.yml"
+    traefik_kubeconfig_path: "{{ traefik_config_dir }}/kubeconfig"
+    kubeconfig_local_tmp: "/tmp/kubeconfig_from_master1.yaml"
+    master_node_ip: "10.17.4.21"
+    ssh_key_path: "/root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift"
 
   tasks:
-    - name: Asegurar que la biblioteca cryptography esté instalada
-      ansible.builtin.pip:
-        name: cryptography
-        state: present
-        executable: pip3
+    - name: Obtener kubeconfig del nodo master en el controlador (solo se ejecuta en localhost)
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.shell: |
+        ssh -i {{ ssh_key_path }} -o StrictHostKeyChecking=no core@{{ master_node_ip }} \
+        'sudo cat /etc/rancher/k3s/k3s.yaml' > {{ kubeconfig_local_tmp }}
 
-    - name: Crear directorio de certificados
+    - name: Modificar el endpoint del servidor API para que apunte al VIP
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.replace:
+        path: "{{ kubeconfig_local_tmp }}"
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: 'server: https://10.17.5.10:6443'
+
+    - name: Verificar si Docker está instalado
+      ansible.builtin.command: "docker -v"
+      register: docker_installed
+      ignore_errors: true
+      changed_when: false
+
+    - name: Instalar Docker si no está instalado
+      ansible.builtin.shell: |
+        dnf install -y docker docker-compose && systemctl enable --now docker
+      when: docker_installed.rc != 0
+
+    - name: Crear directorio de configuración de Traefik
       ansible.builtin.file:
-        path: "{{ certs_dir }}"
+        path: "{{ traefik_config_dir }}"
         state: directory
         mode: "0755"
 
-    - name: Generar clave privada
-      community.crypto.openssl_privatekey:
-        path: "{{ certs_dir }}/{{ wildcard_cert_name }}.key"
-        size: 2048
+    - name: Copiar kubeconfig al home temporalmente
+      delegate_to: localhost
+      ansible.builtin.shell: |
+        scp -i {{ ssh_key_path }} -o StrictHostKeyChecking=no {{ kubeconfig_local_tmp }} core@{{ inventory_hostname }}:/home/core/kubeconfig_temp
+
+    - name: Mover kubeconfig a /etc/traefik con permisos correctos
+      ansible.builtin.shell: |
+        sudo mv /home/core/kubeconfig_temp {{ traefik_kubeconfig_path }} && sudo chmod 600 {{ traefik_kubeconfig_path }}
+      delegate_to: "{{ inventory_hostname }}"
+      become: false  # sudo ya se está usando explícitamente en el comando
+
+    - name: Crear archivo acme.json
+      ansible.builtin.file:
+        path: "{{ traefik_config_dir }}/acme.json"
+        state: touch
         mode: "0600"
 
-    - name: Generar solicitud de certificado (CSR)
-      community.crypto.openssl_csr:
-        path: "{{ certs_dir }}/{{ wildcard_cert_name }}.csr"
-        privatekey_path: "{{ certs_dir }}/{{ wildcard_cert_name }}.key"
-        common_name: "{{ cert_common_name }}"
-        organization_name: "MyOrg"
+    - name: Crear archivo traefik.toml
+      ansible.builtin.template:
+        src: "../../templates/traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
 
-    - name: Generar certificado autofirmado
-      community.crypto.x509_certificate:
-        path: "{{ certs_dir }}/{{ wildcard_cert_name }}.crt"
-        privatekey_path: "{{ certs_dir }}/{{ wildcard_cert_name }}.key"
-        csr_path: "{{ certs_dir }}/{{ wildcard_cert_name }}.csr"
-        provider: selfsigned
-        selfsigned_not_after: "+3650d"
-        subject:
-          common_name: "{{ cert_common_name }}"
-          organization_name: "MyOrg"
-          country_name: "ES"
-          state_or_province_name: "Madrid"
-          locality_name: "Madrid"
+    - name: Crear archivo docker-compose.yml
+      ansible.builtin.template:
+        src: "../../templates/traefik/docker-compose.yml.j2"
+        dest: "{{ docker_compose_file }}"
+        mode: "0644"
 
-    - name: Mostrar detalles del certificado generado
-      ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ wildcard_cert_name }}.crt -noout -text"
-      register: cert_info
+    - name: Detener cualquier contenedor Traefik anterior
+      ansible.builtin.shell: docker-compose down || true
+      args:
+        chdir: "{{ traefik_config_dir }}"
+      ignore_errors: true
+
+    - name: Iniciar Traefik
+      ansible.builtin.shell: docker-compose up -d
+      args:
+        chdir: "{{ traefik_config_dir }}"
+
+    - name: Verificar estado de Traefik
+      ansible.builtin.command: docker ps -f name={{ traefik_container_name }}
+      register: traefik_status
       changed_when: false
 
-    - name: Imprimir detalles del certificado
+    - name: Mostrar resultado
       ansible.builtin.debug:
-        msg: "{{ cert_info.stdout }}"
+        msg: "{{ traefik_status.stdout_lines }}"

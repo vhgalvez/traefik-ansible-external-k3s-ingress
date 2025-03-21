@@ -31,12 +31,8 @@
         privatekey_path: "{{ certs_dir }}/{{ cert_common_name }}.key"
         provider: selfsigned
         selfsigned_not_after: "+3650d"
-        subject:
-          common_name: "{{ cert_common_name }}"
-          organization_name: "MyOrg"
-          country_name: "ES"
-          state_or_province_name: "Madrid"
-          locality_name: "Madrid"
+        common_name: "{{ cert_common_name }}"
+        organization_name: "MyOrg"
 
     - name: Mostrar detalles del certificado generado
       ansible.builtin.command: "openssl x509 -in {{ certs_dir }}/{{ cert_common_name }}.crt -noout -text"
