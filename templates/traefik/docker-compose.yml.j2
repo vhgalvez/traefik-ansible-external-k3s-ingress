@@ -6,17 +6,7 @@ services:
     container_name: traefik
     restart: always
     command:
-      - --api.dashboard=true
-      - --providers.docker=true
-      - --providers.kubernetesIngress=true
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.default.acme.email={{ letsencrypt_email }}
-      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
-      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
-      - --entrypoints.web.http.redirections.entryPoint.to=websecure
-      - --entrypoints.web.http.redirections.entryPoint.scheme=https
-      - --entrypoints.websecure.http.tls=true
+      - --configFile=/etc/traefik/traefik.toml
     ports:
       - "80:80"
       - "443:443"
