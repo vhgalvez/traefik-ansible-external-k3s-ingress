@@ -10,7 +10,6 @@
   insecure = true
 
 [entryPoints]
-
   [entryPoints.web]
     address = ":80"
     [entryPoints.web.http.redirections.entryPoint]
@@ -21,16 +20,13 @@
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
-      certResolver = "default"
 
 [providers]
-
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
 
   [providers.kubernetesCRD]
@@ -41,7 +37,6 @@
     watch = true
 
 [tls]
-
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
@@ -60,7 +55,6 @@
       ]
 
 [certificatesResolvers]
-
   [certificatesResolvers.default]
     [certificatesResolvers.default.acme]
       email = "{{ letsencrypt_email }}"
