@@ -5,8 +5,6 @@ services:
     image: "traefik:v3.3"
     container_name: traefik
     restart: always
-    command:
-      - --configFile=/etc/traefik/traefik.toml
     ports:
       - "80:80"
       - "443:443"
@@ -14,3 +12,17 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "{{ traefik_config_dir }}:/etc/traefik"
+    command:
+      - --api.dashboard=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.kubernetesIngress=true
+      - --providers.kubernetesCRD=true
+      - --providers.file.directory=/etc/traefik/dynamic_conf
+      - --providers.file.watch=true
+      - --certificatesresolvers.default.acme.email={{ letsencrypt_email }}
+      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
+      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
