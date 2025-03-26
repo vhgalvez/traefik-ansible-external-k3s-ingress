@@ -21,8 +21,6 @@ services:
       - --providers.kubernetesCRD=true
       - --providers.file.directory=/etc/traefik/dynamic_conf
       - --providers.file.watch=true
-      - --certificatesresolvers.default.acme.email={{ letsencrypt_email }}
-      - --certificatesresolvers.default.acme.storage=/etc/traefik/acme.json
-      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --log.level=DEBUG

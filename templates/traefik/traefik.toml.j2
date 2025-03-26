@@ -40,8 +40,8 @@
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/wildcard.{{ traefik_domain }}.crt"
-        keyFile  = "/etc/traefik/certs/wildcard.{{ traefik_domain }}.key"
+        certFile = "/etc/traefik/certs/traefik.local.crt"
+        keyFile  = "/etc/traefik/certs/traefik.local.key"
 
   [tls.options]
     [tls.options.default]
@@ -53,12 +53,3 @@
         "TLS_AES_128_GCM_SHA256",
         "TLS_AES_256_GCM_SHA384"
       ]
-
-[certificatesResolvers]
-  [certificatesResolvers.default]
-    [certificatesResolvers.default.acme]
-      email = "{{ letsencrypt_email }}"
-      storage = "/etc/traefik/acme.json"
-      caServer = "https://acme-v02.api.letsencrypt.org/directory"
-      [certificatesResolvers.default.acme.httpChallenge]
-        entryPoint = "web"
