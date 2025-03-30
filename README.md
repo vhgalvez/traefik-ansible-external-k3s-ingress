@@ -1,3 +1,4 @@
+
 # kubernetes-infra-automation
 
 Este repositorio contiene configuraciones y scripts para implementar y gestionar un balanceador de carga eficiente basado en **Traefik** utilizando **Docker Compose** dentro de un entorno Kubernetes. El objetivo principal es facilitar la instalación y configuración de **Traefik** como proxy inverso y balanceador de carga en un nodo dedicado (`loadbalancer1`), optimizado para gestionar nodos maestros, trabajadores y otros servicios de red.
@@ -27,12 +28,9 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    - Ansible instalado en tu máquina de control.
    - Acceso SSH configurado hacia el nodo `loadbalancer1`.
 
-
 ## Instalación y Uso
 
 1. **Clonar el Repositorio**:
-
- 
 
    ```bash
    sudo git clone https://github.com/vhgalvez/kubernetes-infra-automation.git
@@ -41,7 +39,7 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
 
 2. **Configurar el Inventario**:
 
-   Edita el archivo `inventory/hosts.ini` para incluir los detalles del nodo `loadbalancer1`.
+   Edita el archivo `inventory/hosts.ini` para incluir los detalles del nodo `loadbalancer1` y otros nodos relevantes.
 
    ```ini
    [loadbalancer]
@@ -53,32 +51,32 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    Usa el siguiente comando para instalar y configurar Traefik:
 
    ```bash
-   sudo ansible-playbook -i inventory/hosts.ini install_traefik.yml
+   sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml
    ```
 
-# 1️⃣ Generar certificados
+### 1️⃣ Generar Certificados
 
-   Si no tienes certificados SSL, puedes generarlos automáticamente utilizando el siguiente comando:
+Si no tienes certificados SSL, puedes generarlos automáticamente utilizando el siguiente comando:
 
 ```bash
 sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/generate_certs.yml
 ```
 
+### 2️⃣ Instalar y Configurar Traefik con los Certificados
 
-# 2️⃣ Instalar y configurar Traefik con los certificados
+Una vez que los certificados estén listos, puedes instalar y configurar **Traefik** con el siguiente playbook:
 
 ```bash
 sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml
 ```
 
+### 3️⃣ Verificar el Estado de Traefik
 
-1. **Verificar el Estado de Traefik**:
+Una vez finalizada la ejecución, accede al dashboard de Traefik para verificar la configuración:
 
-   Una vez finalizada la ejecución, accede al dashboard de Traefik para verificar la configuración:
-
-   ```
-   http://loadbalancer1.cefaslocalserver.com:8080/dashboard/
-   ```
+```
+http://loadbalancer1.cefaslocalserver.com:8080/dashboard/
+```
 
 ## Personalización
 
@@ -100,18 +98,23 @@ Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE
 
 Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
 
+## Problemas de Resolución DNS
 
-Error de resolución DNS: Si whoami.localhost no se resuelve, añade esta entrada al archivo /etc/hosts en tu máquina cliente:
+Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts` en tu máquina cliente:
 
-plaintext
-Copiar código
+```plaintext
 10.17.3.12 whoami.localhost
+```
 
+---
 
+### Gráfico de la Infraestructura
 
-![alt text](install_traefik.png)
+![Infraestructura Kubernetes](docs/install_traefik.png)
 
+---
 
+### Diagrama de la Infraestructura de Balanceo de Carga
 
 ```bash
                      +-------------------------------------------------+
