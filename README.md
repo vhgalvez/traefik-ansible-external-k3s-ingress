@@ -107,10 +107,12 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 ```
 
 ---
+### Playbook de Ansible traefik instalacion OK
 
-### Gráfico de la Infraestructura
 
 ![Infraestructura Kubernetes](docs/install_traefik.png)
+
+![certifcados](docs/certifcados.png)
 
 ---
 
