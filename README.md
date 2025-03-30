@@ -57,14 +57,22 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    ```
 
 # 1️⃣ Generar certificados
-sudo ansible-playbook generate_certs.yml
+
+   Si no tienes certificados SSL, puedes generarlos automáticamente utilizando el siguiente comando:
+
+```bash
+sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/generate_certs.yml
+```
+
 
 # 2️⃣ Instalar y configurar Traefik con los certificados
-sudo ansible-playbook -i inventory/hosts.ini install_traefik.yml
+
+```bash
+sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml
+```
 
 
-
-4. **Verificar el Estado de Traefik**:
+1. **Verificar el Estado de Traefik**:
 
    Una vez finalizada la ejecución, accede al dashboard de Traefik para verificar la configuración:
 
