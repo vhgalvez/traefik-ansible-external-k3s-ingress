@@ -118,7 +118,9 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 
 ---
 
-### Diagrama de la Infraestructura de Balanceo de Carga
+### Diagrama de la Infraestructura de Balanceo de Carga controlador de Ingress
+
+
 
 ```bash
                      +-------------------------------------------------+
