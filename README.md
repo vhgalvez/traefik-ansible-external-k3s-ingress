@@ -44,6 +44,7 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    ```ini
    [loadbalancer]
    loadbalancer1 ansible_host=10.17.3.12 ansible_user=core ansible_ssh_private_key_file=/ruta/a/tu/clave_privada
+   loadbalancer2 ansible_host=10.17.3.13 ansible_user=core ansible_ssh_private_key_file=/ruta/a/tu/clave_privada
    ```
 
 3. **Ejecutar el Playbook**:
