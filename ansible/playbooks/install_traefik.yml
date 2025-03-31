@@ -4,8 +4,9 @@
   become: true
   gather_facts: false
 
-  vars:
+ vars:
     traefik_dir: /etc/traefik
+    traefik_config_dir: /etc/traefik
     kubeconfig_src_path: /etc/rancher/k3s/k3s.yaml
     kubeconfig_dst_path: "{{ traefik_dir }}/kubeconfig"
     traefik_token_path: "{{ traefik_dir }}/token"
@@ -67,15 +68,15 @@
 
     - name: 📦 Copiar archivo .env
       template:
-        src: "../../templates/traefik/env.j2"
+        src: templates/traefik/env.j2
         dest: "{{ traefik_dir }}/.env"
-        mode: "0644"
+        mode: '0644'
 
     - name: 🐳 Deploy Docker Compose (Traefik)
       template:
         src: templates/traefik/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
-        mode: "0644"
+        mode: '0644'
 
     - name: 🚀 Lanzar contenedor Traefik
       community.docker.docker_compose:
