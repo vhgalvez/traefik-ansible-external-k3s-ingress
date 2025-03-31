@@ -2,44 +2,17 @@
 - name: Install and Configure Traefik as Ingress Controller using Docker
   hosts: load_balancers
   become: true
-
   vars:
     traefik_config_dir: "/etc/traefik"
     k8s_api_vip: "10.17.5.10"
-    kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
-    kubeconfig_temp: "/tmp/kubeconfig-traefik"
-    kubeconfig_dest: "/etc/traefik/kubeconfig"
+    kubeconfig_local_path: "/tmp/kubeconfig-traefik"
+    kubeconfig_remote_path: "/etc/traefik/kubeconfig"
     cert_common_name: "traefik.local"
     certs_local_dir: "files/certs"
+    master_host: "{{ groups['masters'][0] }}"
 
   tasks:
-    - name: Remove Podman-Docker conflict
-      package:
-        name: podman-docker
-        state: absent
-
-    - name: Add Docker CE repo
-      get_url:
-        url: https://download.docker.com/linux/centos/docker-ce.repo
-        dest: /etc/yum.repos.d/docker-ce.repo
-      when: ansible_os_family == "RedHat"
-
-    - name: Install Docker and Compose plugin
-      package:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-compose-plugin
-        state: present
-
-    - name: Ensure Docker is running
-      systemd:
-        name: docker
-        enabled: yes
-        state: started
-
-    - name: Create required directories
+    - name: 🧹 Ensure directories exist
       file:
         path: "{{ item }}"
         state: directory
@@ -49,103 +22,113 @@
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
 
-    - name: Copy TLS certs
+    - name: 📄 Copy certificates to load balancer
       copy:
         src: "{{ certs_local_dir }}/{{ cert_common_name }}.{{ item }}"
         dest: "{{ traefik_config_dir }}/certs/{{ cert_common_name }}.{{ item }}"
         mode: "0644"
-      loop:
-        - crt
-        - key
+      loop: ["crt", "key"]
 
-    - name: Fetch kubeconfig using raw from master1
-      delegate_to: 10.17.4.21
+    - name: 📦 Install Docker and dependencies (RedHat)
+      when: ansible_os_family == "RedHat"
+      block:
+        - name: Add Docker CE repo
+          get_url:
+            url: https://download.docker.com/linux/centos/docker-ce.repo
+            dest: /etc/yum.repos.d/docker-ce.repo
+
+        - name: Install Docker packages
+          package:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-compose-plugin
+            state: present
+
+        - name: Enable Docker
+          systemd:
+            name: docker
+            enabled: true
+            state: started
+
+    - name: 🛫 Obtener kubeconfig del master
+      delegate_to: "{{ master_host }}"
       become: false
-      raw: cat {{ kubeconfig_path }}
+      raw: |
+        cat /etc/rancher/k3s/k3s.yaml
       register: raw_kubeconfig
 
-    - name: Save kubeconfig locally
+    - name: 📄 Guardar kubeconfig localmente con VIP
       delegate_to: localhost
       become: false
       copy:
-        content: "{{ raw_kubeconfig.stdout }}"
-        dest: "{{ kubeconfig_temp }}"
+        content: "{{ raw_kubeconfig.stdout | regex_replace('127.0.0.1', k8s_api_vip) }}"
+        dest: "{{ kubeconfig_local_path }}"
 
-    - name: Replace 127.0.0.1 with VIP
-      delegate_to: localhost
-      become: false
-      replace:
-        path: "{{ kubeconfig_temp }}"
-        regexp: 'https://127.0.0.1:6443'
-        replace: "https://{{ k8s_api_vip }}:6443"
-
-    - name: Create ServiceAccount and ClusterRoleBinding
+    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding para Traefik
       delegate_to: localhost
       become: false
       shell: |
-        export KUBECONFIG={{ kubeconfig_temp }}
-        kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
-        kubectl create clusterrolebinding traefik-ingress-controller \
-          --clusterrole=cluster-admin \
-          --serviceaccount=kube-system:traefik-ingress-controller \
-          --dry-run=client -o yaml | kubectl apply -f -
+        KUBECONFIG={{ kubeconfig_local_path }} kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_local_path }} apply -f -
+        KUBECONFIG={{ kubeconfig_local_path }} kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_local_path }} apply -f -
 
-    - name: Retrieve token from ServiceAccount
+    - name: 🔑 Obtener token de ServiceAccount
       delegate_to: localhost
       become: false
       shell: |
-        export KUBECONFIG={{ kubeconfig_temp }}
-        TOKEN_NAME=$(kubectl -n kube-system get sa traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
-        kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
-      register: traefik_token
+        TOKEN_NAME=$(kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
+        kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
+      register: traefik_token_result
 
-    - name: Save kubeconfig to Traefik node
+    - name: 📂 Copiar kubeconfig al nodo load balancer
       copy:
-        src: "{{ kubeconfig_temp }}"
-        dest: "{{ kubeconfig_dest }}"
+        src: "{{ kubeconfig_local_path }}"
+        dest: "{{ kubeconfig_remote_path }}"
         mode: "0644"
 
-    - name: Create acme.json
-      copy:
-        dest: "{{ traefik_config_dir }}/acme.json"
-        content: "{}"
-        mode: "0600"
-
-    - name: Create traefik.toml
-      template:
-        src: "../../templates/traefik/traefik.toml.j2"
-        dest: "{{ traefik_config_dir }}/traefik.toml"
-        mode: "0644"
-      vars:
-        traefik_token: "{{ traefik_token.stdout }}"
-
-    - name: Create docker-compose.yml
-      template:
-        src: "../../templates/traefik/docker-compose.yml.j2"
-        dest: "{{ traefik_config_dir }}/docker-compose.yml"
-        mode: "0644"
-
-    - name: Generate .env file
+    - name: 📦 Crear archivo .env para Traefik
       copy:
         dest: "{{ traefik_config_dir }}/.env"
         content: |
           TRAEFIK_CONFIG_DIR={{ traefik_config_dir }}
           TRAEFIK_CERT_CN={{ cert_common_name }}
-          TRAEFIK_KUBECONFIG={{ kubeconfig_dest }}
+          TRAEFIK_KUBECONFIG={{ kubeconfig_remote_path }}
           TRAEFIK_API_VIP={{ k8s_api_vip }}
-          TRAEFIK_TOKEN={{ traefik_token.stdout }}
+          TRAEFIK_TOKEN={{ traefik_token_result.stdout }}
+        mode: "0644"
 
-    - name: Restart Traefik
+    - name: 🧾 Crear archivo acme.json
+      copy:
+        dest: "{{ traefik_config_dir }}/acme.json"
+        content: "{}"
+        mode: "0600"
+
+    - name: 🛠️ Render traefik.toml config
+      template:
+        src: "../../templates/traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
+      vars:
+        traefik_token: "{{ traefik_token_result.stdout }}"
+
+    - name: 🛠️ Render docker-compose.yml
+      template:
+        src: "../../templates/traefik/docker-compose.yml.j2"
+        dest: "{{ traefik_config_dir }}/docker-compose.yml"
+        mode: "0644"
+
+    - name: 🚀 Iniciar Traefik con docker-compose
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
 
-    - name: Docker status
+    - name: 🔍 Verificar estado del contenedor
       shell: docker ps -a | grep traefik
-      register: docker_status
+      register: traefik_status
 
-    - name: Show Traefik container info
+    - name: 📊 Mostrar estado
       debug:
-        msg: "{{ docker_status.stdout_lines }}"
+        msg: "{{ traefik_status.stdout_lines }}"

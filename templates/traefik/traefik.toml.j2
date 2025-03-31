@@ -72,13 +72,6 @@
 [serversTransport]
   maxIdleConnsPerHost = 200
 
-# Repetimos redirección por compatibilidad
-[entryPoints.web.http]
-  [entryPoints.web.http.redirections]
-    [entryPoints.web.http.redirections.entryPoint]
-      to = "websecure"
-      scheme = "https"
-      permanent = true
 
 # Punto de salud
 [ping]
