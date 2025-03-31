@@ -10,7 +10,7 @@
     kubeconfig_remote_path: "/etc/traefik/kubeconfig"
     cert_common_name: "traefik.local"
     certs_local_dir: "files/certs"
-    master1_ip: "10.17.4.21"
+    master_host: "10.17.4.21"
 
   tasks:
     - name: Remove conflicts with Podman
@@ -59,57 +59,74 @@
         - key
 
     - name: Retrieve kubeconfig from master1 using raw (Flatcar compatible)
-      delegate_to: "{{ master1_ip }}"
+      delegate_to: "{{ master_host }}"
       become: false
-      raw: |
-        cat /etc/rancher/k3s/k3s.yaml
-      register: raw_kubeconfig
       run_once: true
+      raw: cat /etc/rancher/k3s/k3s.yaml
+      register: raw_kubeconfig
 
     - name: Save kubeconfig to local temp file
       delegate_to: localhost
+      become: false
       copy:
-        dest: "{{ kubeconfig_local_path }}"
         content: "{{ raw_kubeconfig.stdout }}"
-      run_once: true
+        dest: "{{ kubeconfig_local_path }}"
+        mode: "0644"
 
     - name: Replace 127.0.0.1 with API VIP in kubeconfig
       delegate_to: localhost
+      become: false
       replace:
         path: "{{ kubeconfig_local_path }}"
-        regexp: "https://127.0.0.1:6443"
+        regexp: 'https://127.0.0.1:6443'
         replace: "https://{{ k8s_api_vip }}:6443"
-      run_once: true
 
     - name: Create service account and clusterrolebinding for Traefik
       delegate_to: localhost
       become: false
       shell: |
-        KUBECONFIG={{ kubeconfig_local_path }} kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
-        KUBECONFIG={{ kubeconfig_local_path }} kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
-      run_once: true
+        KUBECONFIG={{ kubeconfig_local_path }} kubectl apply -f - <<EOF
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: traefik-ingress-controller
+          namespace: kube-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: traefik-ingress-controller
+        subjects:
+        - kind: ServiceAccount
+          name: traefik-ingress-controller
+          namespace: kube-system
+        roleRef:
+          kind: ClusterRole
+          name: cluster-admin
+          apiGroup: rbac.authorization.k8s.io
+        EOF
 
-    - name: Retrieve token for Traefik ServiceAccount
+    - name: Retrieve Traefik token from Kubernetes
       delegate_to: localhost
+      become: false
       shell: |
         TOKEN_NAME=$(kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
         kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
       register: traefik_token_result
-      run_once: true
 
-    - name: Copy kubeconfig to load balancer nodes
+    - name: Copy kubeconfig to Traefik nodes
       copy:
         src: "{{ kubeconfig_local_path }}"
         dest: "{{ kubeconfig_remote_path }}"
         mode: "0644"
 
-    - name: Create acme.json file
+    - name: Create acme.json file (for TLS certificates)
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
 
-    - name: Generate traefik.toml configuration
+    - name: Create traefik.toml configuration file
       template:
         src: "../../templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
@@ -117,7 +134,13 @@
       vars:
         traefik_token: "{{ traefik_token_result.stdout }}"
 
-    - name: Crear archivo .env con configuración de Traefik
+    - name: Create docker-compose.yml file
+      template:
+        src: "../../templates/traefik/docker-compose.yml.j2"
+        dest: "{{ traefik_config_dir }}/docker-compose.yml"
+        mode: "0644"
+
+    - name: Create .env file with Traefik configuration
       copy:
         dest: "{{ traefik_config_dir }}/.env"
         content: |
@@ -128,13 +151,7 @@
           TRAEFIK_TOKEN={{ traefik_token_result.stdout }}
         mode: "0644"
 
-    - name: Generate docker-compose.yml
-      template:
-        src: "../../templates/traefik/docker-compose.yml.j2"
-        dest: "{{ traefik_config_dir }}/docker-compose.yml"
-        mode: "0644"
-
-    - name: Deploy Traefik container with Docker Compose
+    - name: Restart Traefik container
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
