@@ -7,7 +7,7 @@
 
 [api]
   dashboard = true
-  insecure = true  # Solo accesible desde localhost
+  insecure = true  # Dashboard solo accesible en localhost:8080
 
 [entryPoints]
 
@@ -20,11 +20,10 @@
 
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]
-      certResolver = "default"
+    [entryPoints.websecure.http.tls]  # Habilita TLS para este entrypoint
 
   [entryPoints.traefik]
-    address = "127.0.0.1:8080"  # Dashboard solo accesible desde localhost
+    address = "127.0.0.1:8080"  # ⚠️ Solo accesible en localhost
 
 [providers]
 
