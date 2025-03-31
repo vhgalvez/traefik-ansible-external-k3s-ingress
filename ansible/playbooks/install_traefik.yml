@@ -21,11 +21,11 @@
           - python3-pip
         state: present
 
-    - name: 📦 Instalar Docker SDK para Python y docker-compose
+    - name: 📦 Instalar versiones compatibles de Docker SDK y docker-compose
       pip:
         name:
-          - docker
-          - docker-compose
+          - docker==5.0.3
+          - docker-compose==1.29.2
         executable: pip3
 
     - name: 📁 Crear directorios Traefik
