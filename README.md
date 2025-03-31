@@ -87,18 +87,6 @@ http://loadbalancer1.cefaslocalserver.com:8080/dashboard/
 - **Certificados SSL**:
   Asegúrate de configurar correctamente el email para Let's Encrypt en `traefik.toml.j2`.
 
-## Contribuciones
-
-¡Las contribuciones son bienvenidas! Si encuentras algún problema o tienes sugerencias de mejora, abre un issue o envía un pull request.
-
-## Licencia
-
-Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
-
-## Autor
-
-Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
-
 ## Problemas de Resolución DNS
 
 Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts` en tu máquina cliente:
@@ -160,3 +148,15 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
       |                 IP: 10.17.4.24 / 25 / 26 / 27                 |
       +---------------------------------------------------------------+
 ```
+
+## Contribuciones
+
+¡Las contribuciones son bienvenidas! Si encuentras algún problema o tienes sugerencias de mejora, abre un issue o envía un pull request.
+
+## Licencia
+
+Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
+
+## Autor
+
+Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
