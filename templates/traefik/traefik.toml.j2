@@ -20,6 +20,7 @@
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
+      certResolver = "default"
 
 [providers]
   [providers.docker]
