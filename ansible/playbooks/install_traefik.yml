@@ -1,6 +1,6 @@
 ---
 - name: 🚀 Instalar y Configurar Traefik como Ingress Controller usando Docker
-  hosts: traefik
+  hosts: load_balancers
   become: true
   gather_facts: false
 
