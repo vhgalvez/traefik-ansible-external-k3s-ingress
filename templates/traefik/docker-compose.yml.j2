@@ -11,11 +11,15 @@ services:
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - "{{ traefik_config_dir }}:/etc/traefik"
+      - "{{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro"
+      - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
+      - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
+      - "{{ traefik_config_dir }}/kubeconfig:/etc/traefik/kubeconfig:ro"
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.traefik.address=:8080
       - --providers.docker=true
       - --providers.kubernetesIngress=true
       - --providers.kubernetesCRD=true
