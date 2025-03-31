@@ -21,9 +21,11 @@
           - python3-pip
         state: present
 
-    - name: 📦 Instalar módulo Docker SDK en los balanceadores
+    - name: 📦 Instalar Docker SDK para Python y docker-compose
       pip:
-        name: docker
+        name:
+          - docker
+          - docker-compose
         executable: pip3
 
     - name: 📁 Crear directorios Traefik
