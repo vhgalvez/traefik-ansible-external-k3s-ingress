@@ -1,52 +1,58 @@
+# Configuración principal global
 [global]
-  checkNewVersion = true
-  sendAnonymousUsage = false
+  checkNewVersion = true        # Comprobar nuevas versiones (puede desactivarse en producción)
+  sendAnonymousUsage = false    # No enviar estadísticas de uso
 
+# Nivel de log para debug durante desarrollo
 [log]
-  level = "DEBUG"
+  level = "DEBUG"  # ⚠️ Cambiar a "INFO" o "ERROR" en producción
 
+# Configuración de API y dashboard
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Solo accesible desde red local, NO expongas este puerto a Internet
+  insecure = true  # ⚠️ Inseguro, solo para uso interno. Cambiar a false y usar autenticación cuando se exponga a Internet
 
+# Entrypoints de red
 [entryPoints]
 
-  [entryPoints.web]
+  [entryPoints.web]               # HTTP (redirección automática a HTTPS)
     address = ":80"
     [entryPoints.web.http.redirections.entryPoint]
       to = "websecure"
       scheme = "https"
       permanent = true
 
-  [entryPoints.websecure]
+  [entryPoints.websecure]        # HTTPS con TLS
     address = ":443"
-    [entryPoints.websecure.http.tls]  # Habilita TLS para este entrypoint
+    [entryPoints.websecure.http.tls]  # TLS habilitado para HTTPS
 
-  [entryPoints.traefik]
-    address = ":8080"  # ✅ Permitimos acceso desde el servidor físico (no solo localhost)
+  [entryPoints.traefik]          # Dashboard en localhost
+    address = ":8080"  # ⚠️ Cambiar a 127.0.0.1:8080 cuando se exponga y usar túnel SSH o VPN
 
+# Proveedores de configuración
 [providers]
 
-  [providers.docker]
+  [providers.docker]                         # Integración con Docker
     endpoint = "unix:///var/run/docker.sock"
-    exposedByDefault = false
+    exposedByDefault = false  # ⚠️ Solo expone contenedores que tengan label traefik.enable=true
 
-  [providers.kubernetesIngress]
+  [providers.kubernetesIngress]              # Ingress Controller para K3s
     namespaces = ["default", "traefik"]
 
-  [providers.kubernetesCRD]
+  [providers.kubernetesCRD]                 # CRDs para Traefik
     namespaces = ["default", "traefik"]
 
-  [providers.file]
+  [providers.file]                           # Configuración adicional por archivos
     directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
+# Configuración TLS con certificados autofirmados
 [tls]
 
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/traefik.local.crt"
+        certFile = "/etc/traefik/certs/traefik.local.crt"  # ⚠️ Reemplazar por certificados reales al exponer a Internet
         keyFile  = "/etc/traefik/certs/traefik.local.key"
 
   [tls.options]
@@ -59,3 +65,19 @@
         "TLS_AES_128_GCM_SHA256",
         "TLS_AES_256_GCM_SHA384"
       ]
+
+# Optimización de conexiones a backend
+[serversTransport]
+  maxIdleConnsPerHost = 200
+
+# Redirección automática de HTTP a HTTPS (repetido por compatibilidad)
+[entryPoints.web.http]
+  [entryPoints.web.http.redirections]
+    [entryPoints.web.http.redirections.entryPoint]
+      to = "websecure"
+      scheme = "https"
+      permanent = true
+
+# Endpoint para chequeo de salud
+[ping]
+  entryPoint = "traefik"
