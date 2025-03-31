@@ -92,9 +92,18 @@
         dest: "{{ traefik_dir }}/docker-compose.yml"
         mode: "0644"
 
-    - name: 🚀 Lanzar contenedor Traefik
-      community.docker.docker_compose:
-        project_src: "{{ traefik_dir }}"
-        state: present
-        docker_host: "unix:///var/run/docker.sock"
-        tls: false
+    - name: 🔍 Verificar existencia del socket Docker
+      stat:
+        path: /var/run/docker.sock
+      register: docker_sock
+
+    - name: ❌ Fallar si Docker socket no existe
+      fail:
+        msg: "❌ No se encontró /var/run/docker.sock. Docker no está disponible o no tiene permisos."
+      when: not docker_sock.stat.exists
+
+    - name: 🚀 Lanzar contenedor Traefik con docker compose CLI
+      ansible.builtin.shell: |
+        docker compose -f {{ traefik_dir }}/docker-compose.yml --env-file {{ traefik_dir }}/.env up -d
+      args:
+        executable: /bin/bash
