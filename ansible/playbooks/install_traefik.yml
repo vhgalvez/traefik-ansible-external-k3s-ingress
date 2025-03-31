@@ -8,6 +8,8 @@
     k8s_api_vip: "10.17.5.10"
     kubeconfig_local_path: "/tmp/kubeconfig-traefik"
     kubeconfig_remote_path: "/etc/traefik/kubeconfig"
+    cert_common_name: "traefik.local"
+    certs_local_dir: "files/certs"
 
   tasks:
     - name: Remove conflicts with Podman
@@ -41,6 +43,27 @@
         path: "{{ traefik_config_dir }}"
         state: directory
         mode: "0755"
+
+    - name: Create certs directory
+      file:
+        path: "{{ traefik_config_dir }}/certs"
+        state: directory
+        mode: "0755"
+
+    - name: Create dynamic_conf directory
+      file:
+        path: "{{ traefik_config_dir }}/dynamic_conf"
+        state: directory
+        mode: "0755"
+
+    - name: Copy certificates to load balancer
+      copy:
+        src: "{{ certs_local_dir }}/{{ cert_common_name }}.{{ item }}"
+        dest: "{{ traefik_config_dir }}/certs/{{ cert_common_name }}.{{ item }}"
+        mode: "0644"
+      loop:
+        - crt
+        - key
 
     - name: Copy kubeconfig from master1 to localhost (Flatcar workaround)
       delegate_to: localhost
