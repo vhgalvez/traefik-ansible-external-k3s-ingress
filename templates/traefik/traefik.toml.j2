@@ -7,7 +7,7 @@
 
 [api]
   dashboard = true
-  insecure = true
+  insecure = false  # Ahora será seguro por HTTPS
 
 [entryPoints]
   [entryPoints.web]
@@ -20,6 +20,9 @@
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
+
+  [entryPoints.traefik]
+    address = ":8080"
 
 [providers]
   [providers.docker]
@@ -53,3 +56,9 @@
         "TLS_AES_128_GCM_SHA256",
         "TLS_AES_256_GCM_SHA384"
       ]
+
+[http.routers.dashboard-https]
+  rule = "Host(`loadbalancer1.cefaslocalserver.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+  entryPoints = ["websecure"]
+  service = "api@internal"
+  [http.routers.dashboard-https.tls]
