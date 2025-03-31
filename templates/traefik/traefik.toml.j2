@@ -3,13 +3,16 @@
   checkNewVersion = true
   sendAnonymousUsage = false
 
+# Nivel de log
 [log]
-  level = "DEBUG"
+  level = "DEBUG"  # Cambiar a "INFO" o "ERROR" en producción
 
+# API y dashboard
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Solo para acceso interno/VPN
+  insecure = true  # ⚠️ Solo para VPN o localhost
 
+# Entrypoints de red
 [entryPoints]
 
   [entryPoints.web]
@@ -26,6 +29,7 @@
   [entryPoints.traefik]
     address = ":8080"
 
+# Proveedores de configuración
 [providers]
 
   [providers.docker]
@@ -33,13 +37,16 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
+    namespaces = ["default", "traefik"]
 
   [providers.kubernetesCRD]
+    namespaces = ["default", "traefik"]
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
+# Certificados TLS
 [tls]
 
   [tls.stores]
@@ -59,8 +66,10 @@
         "TLS_AES_256_GCM_SHA384"
       ]
 
+# Optimización de conexiones
 [serversTransport]
   maxIdleConnsPerHost = 200
 
+# Health check interno
 [ping]
   entryPoint = "traefik"
