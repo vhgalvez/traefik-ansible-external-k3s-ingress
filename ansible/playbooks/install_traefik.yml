@@ -4,7 +4,7 @@
   become: true
   gather_facts: false
 
- vars:
+  vars:
     traefik_dir: /etc/traefik
     traefik_config_dir: /etc/traefik
     kubeconfig_src_path: /etc/rancher/k3s/k3s.yaml
