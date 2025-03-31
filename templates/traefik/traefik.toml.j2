@@ -20,7 +20,9 @@
   [entryPoints.websecure]
     address = ":443"
     [entryPoints.websecure.http.tls]
-      certResolver = "default"
+      [[entryPoints.websecure.http.tls.certificates]]
+        certFile = "/etc/traefik/certs/traefik.local.crt"
+        keyFile  = "/etc/traefik/certs/traefik.local.key"
 
 [providers]
   [providers.docker]
