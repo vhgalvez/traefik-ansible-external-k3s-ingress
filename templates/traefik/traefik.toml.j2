@@ -7,7 +7,7 @@
 
 [api]
   dashboard = true
-  insecure = false  # Ahora será seguro por HTTPS
+  insecure = false  # ✅ dashboard ahora va por HTTPS, NO en HTTP
 
 [entryPoints]
   [entryPoints.web]
@@ -61,4 +61,10 @@
   rule = "Host(`loadbalancer1.cefaslocalserver.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
   entryPoints = ["websecure"]
   service = "api@internal"
+  middlewares = ["dashboard-auth"]
   [http.routers.dashboard-https.tls]
+
+[http.middlewares.dashboard-auth.basicAuth]
+  users = [
+    "admin:$$apr1$$KbWm3bmi$$z0wNqvhq4zAOjGhP/MbwP."  # ← Puedes cambiar este hash o eliminarlo si no deseas auth
+  ]
