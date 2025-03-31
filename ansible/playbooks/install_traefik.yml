@@ -67,9 +67,9 @@
 
     - name: 📦 Copiar archivo .env
       template:
-        src: templates/env.j2
+        src: "../../templates/traefik/env.j2"
         dest: "{{ traefik_dir }}/.env"
-        mode: "0644"
+        mode: '0644'
 
     - name: 🐳 Deploy Docker Compose (Traefik)
       template:
