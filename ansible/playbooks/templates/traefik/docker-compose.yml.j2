@@ -16,7 +16,6 @@ services:
       - "{{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro"
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
-      - "{{ traefik_config_dir }}/kubeconfig:/etc/traefik/kubeconfig:ro"
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80
