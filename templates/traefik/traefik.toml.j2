@@ -10,39 +10,41 @@
 # Configuración de API y dashboard
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Inseguro, solo para uso interno. Cambiar a false y usar autenticación cuando se exponga a Internet
+  insecure = true  # ⚠️ Solo para localhost / VPN. Al exponer públicamente: usar autenticación o deshabilitar
 
 # Entrypoints de red
 [entryPoints]
 
-  [entryPoints.web]               # HTTP (redirección automática a HTTPS)
+  [entryPoints.web]
     address = ":80"
     [entryPoints.web.http.redirections.entryPoint]
       to = "websecure"
       scheme = "https"
       permanent = true
 
-  [entryPoints.websecure]        # HTTPS con TLS
+  [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]  # TLS habilitado para HTTPS
+    [entryPoints.websecure.http.tls]
 
-  [entryPoints.traefik]          # Dashboard en localhost
-    address = ":8080"  # ⚠️ Cambiar a 127.0.0.1:8080 cuando se exponga y usar túnel SSH o VPN
+  [entryPoints.traefik]
+    address = ":8080"  # ⚠️ Solo accesible desde localhost (o restringir con firewall)
 
 # Proveedores de configuración
 [providers]
 
-  [providers.docker]                         # Integración con Docker
+  [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
-    exposedByDefault = false  # ⚠️ Solo expone contenedores que tengan label traefik.enable=true
+    exposedByDefault = false
 
-  [providers.kubernetesIngress]              # Ingress Controller para K3s
+  [providers.kubernetesIngress]
+    kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
 
-  [providers.kubernetesCRD]                 # CRDs para Traefik
+  [providers.kubernetesCRD]
+    kubeconfig = "/etc/traefik/kubeconfig"
     namespaces = ["default", "traefik"]
 
-  [providers.file]                           # Configuración adicional por archivos
+  [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
@@ -52,7 +54,7 @@
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/traefik.local.crt"  # ⚠️ Reemplazar por certificados reales al exponer a Internet
+        certFile = "/etc/traefik/certs/traefik.local.crt"
         keyFile  = "/etc/traefik/certs/traefik.local.key"
 
   [tls.options]
@@ -66,11 +68,11 @@
         "TLS_AES_256_GCM_SHA384"
       ]
 
-# Optimización de conexiones a backend
+# Conexiones persistentes a backend
 [serversTransport]
   maxIdleConnsPerHost = 200
 
-# Redirección automática de HTTP a HTTPS (repetido por compatibilidad)
+# Repetimos redirección por compatibilidad
 [entryPoints.web.http]
   [entryPoints.web.http.redirections]
     [entryPoints.web.http.redirections.entryPoint]
@@ -78,6 +80,6 @@
       scheme = "https"
       permanent = true
 
-# Endpoint para chequeo de salud
+# Punto de salud
 [ping]
   entryPoint = "traefik"
