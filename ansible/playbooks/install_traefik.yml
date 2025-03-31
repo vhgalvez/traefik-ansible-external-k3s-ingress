@@ -26,8 +26,8 @@
 
     - name: 📄 Copiar certificados TLS
       copy:
-        src: "files/certs/traefik.{{ item }}"
-        dest: "{{ traefik_dir }}/certs/traefik.{{ item }}"
+        src: "ansible/playbooks/files/certs/traefik.local.{{ item }}"
+        dest: "{{ traefik_dir }}/certs/traefik.local.{{ item }}"
         mode: '0644'
       loop:
         - crt
