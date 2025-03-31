@@ -96,3 +96,4 @@
       community.docker.docker_compose:
         project_src: "{{ traefik_dir }}"
         state: present
+        docker_host: unix:///var/run/docker.sock
