@@ -1,20 +1,19 @@
 # Configuración principal global
 [global]
-  checkNewVersion = true        # Comprobar nuevas versiones (puede desactivarse en producción)
-  sendAnonymousUsage = false    # No enviar estadísticas de uso
+  checkNewVersion = true
+  sendAnonymousUsage = false
 
-# Nivel de log para debug durante desarrollo
+# Nivel de log
 [log]
-  level = "DEBUG"  # ⚠️ Cambiar a "INFO" o "ERROR" en producción
+  level = "DEBUG"
 
-# Configuración de API y dashboard
+# API y dashboard
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Solo para localhost / VPN. Al exponer públicamente: usar autenticación o deshabilitar
+  insecure = true
 
-# Entrypoints de red
+# Entrypoints
 [entryPoints]
-
   [entryPoints.web]
     address = ":80"
     [entryPoints.web.http.redirections.entryPoint]
@@ -27,9 +26,9 @@
     [entryPoints.websecure.http.tls]
 
   [entryPoints.traefik]
-    address = ":8080"  # ⚠️ Solo accesible desde localhost (o restringir con firewall)
+    address = ":8080"
 
-# Proveedores de configuración
+# Proveedores
 [providers]
 
   [providers.docker]
@@ -46,7 +45,7 @@
     directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
-# Configuración TLS con certificados autofirmados
+# TLS
 [tls]
 
   [tls.stores]
@@ -66,10 +65,6 @@
         "TLS_AES_256_GCM_SHA384"
       ]
 
-# Conexiones persistentes a backend
-[serversTransport]
-  maxIdleConnsPerHost = 200
-
-# Punto de salud
+# Health check
 [ping]
   entryPoint = "traefik"
