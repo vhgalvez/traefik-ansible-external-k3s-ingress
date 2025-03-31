@@ -10,8 +10,10 @@
     kubeconfig_remote_path: "/etc/traefik/kubeconfig"
     cert_common_name: "traefik.local"
     certs_local_dir: "files/certs"
+    master1_ip: "10.17.4.21"
 
   tasks:
+
     - name: Remove conflicts with Podman
       package:
         name: podman-docker
@@ -38,25 +40,17 @@
         enabled: yes
         state: started
 
-    - name: Create Traefik configuration directory
+    - name: Create Traefik configuration directories
       file:
-        path: "{{ traefik_config_dir }}"
+        path: "{{ item }}"
         state: directory
         mode: "0755"
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/certs"
+        - "{{ traefik_config_dir }}/dynamic_conf"
 
-    - name: Create certs directory
-      file:
-        path: "{{ traefik_config_dir }}/certs"
-        state: directory
-        mode: "0755"
-
-    - name: Create dynamic_conf directory
-      file:
-        path: "{{ traefik_config_dir }}/dynamic_conf"
-        state: directory
-        mode: "0755"
-
-    - name: Copy certificates to load balancer
+    - name: Copy TLS certificates
       copy:
         src: "{{ certs_local_dir }}/{{ cert_common_name }}.{{ item }}"
         dest: "{{ traefik_config_dir }}/certs/{{ cert_common_name }}.{{ item }}"
@@ -65,53 +59,58 @@
         - crt
         - key
 
-    - name: Copy kubeconfig from master1 to localhost (Flatcar workaround)
-      delegate_to: localhost
-      run_once: true
+    - name: Retrieve kubeconfig from master1 using raw (Flatcar compatible)
+      delegate_to: "{{ master1_ip }}"
       become: false
-      shell: |
-        scp -o StrictHostKeyChecking=no -i /root/.ssh/cluster_openshift/key_cluster_openshift/id_rsa_key_cluster_openshift \
-        core@10.17.4.21:/etc/rancher/k3s/k3s.yaml {{ kubeconfig_local_path }}
+      raw: |
+        cat /etc/rancher/k3s/k3s.yaml
+      register: raw_kubeconfig
+      run_once: true
 
-    - name: Replace 127.0.0.1 with VIP in kubeconfig
+    - name: Save kubeconfig to local temp file
       delegate_to: localhost
+      copy:
+        dest: "{{ kubeconfig_local_path }}"
+        content: "{{ raw_kubeconfig.stdout }}"
       run_once: true
-      become: false
+
+    - name: Replace 127.0.0.1 with API VIP in kubeconfig
+      delegate_to: localhost
       replace:
         path: "{{ kubeconfig_local_path }}"
         regexp: 'https://127.0.0.1:6443'
         replace: "https://{{ k8s_api_vip }}:6443"
-
-    - name: Create ServiceAccount and ClusterRoleBinding
-      delegate_to: localhost
       run_once: true
+
+    - name: Create service account and clusterrolebinding for Traefik
+      delegate_to: localhost
       become: false
       shell: |
-        KUBECONFIG={{ kubeconfig_local_path }} kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_local_path }} apply -f -
-        KUBECONFIG={{ kubeconfig_local_path }} kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_local_path }} apply -f -
-
-    - name: Retrieve Traefik token from Kubernetes
-      delegate_to: localhost
+        KUBECONFIG={{ kubeconfig_local_path }} kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+        KUBECONFIG={{ kubeconfig_local_path }} kubectl create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
       run_once: true
-      become: false
+
+    - name: Retrieve token for Traefik ServiceAccount
+      delegate_to: localhost
       shell: |
         TOKEN_NAME=$(kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get sa/traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
         kubectl --kubeconfig={{ kubeconfig_local_path }} -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
       register: traefik_token_result
+      run_once: true
 
-    - name: Copy kubeconfig to Traefik nodes
+    - name: Copy kubeconfig to load balancer nodes
       copy:
         src: "{{ kubeconfig_local_path }}"
         dest: "{{ kubeconfig_remote_path }}"
         mode: "0644"
 
-    - name: Create acme.json file (for TLS certificates)
+    - name: Create acme.json file
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
 
-    - name: Create traefik.toml configuration file
+    - name: Generate traefik.toml configuration
       template:
         src: "../../templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
@@ -119,23 +118,22 @@
       vars:
         traefik_token: "{{ traefik_token_result.stdout }}"
 
-    - name: Create docker-compose.yml file
+    - name: Generate docker-compose.yml
       template:
         src: "../../templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
-    - name: Restart Traefik container
+    - name: Deploy Traefik container with Docker Compose
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
 
-    - name: Check Traefik container status
+    - name: Show Traefik container status
       shell: docker ps -a | grep traefik
       register: traefik_status
 
-    - name: Show Traefik container status
-      debug:
+    - debug:
         msg: "{{ traefik_status.stdout_lines }}"
