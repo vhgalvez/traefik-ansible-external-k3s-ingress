@@ -14,6 +14,18 @@
     vip: 10.17.5.10
 
   tasks:
+    - name: 🐍 Instalar Python 3 y pip en AlmaLinux
+      package:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: 📦 Instalar módulo Docker SDK en los balanceadores
+      pip:
+        name: docker
+        executable: pip3
+
     - name: 📁 Crear directorios Traefik
       file:
         path: "{{ item }}"
