@@ -118,8 +118,11 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 
 ---
 
+
 ### Diagrama de la Infraestructura de Balanceo de Carga controlador de Ingress
 
+
+![Infraestructura Kubernetes](docs/ingress.png)
 
 
 ```bash
@@ -159,6 +162,3 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
       |                 IP: 10.17.4.24 / 25 / 26 / 27                 |
       +---------------------------------------------------------------+
 ```
-
-
-![Infraestructura Kubernetes](docs/ingress.png)
