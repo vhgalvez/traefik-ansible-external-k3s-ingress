@@ -7,7 +7,7 @@
 
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Solo accesible por localhost vía túnel SSH
+  insecure = true  # ⚠️ Solo accesible desde red local, NO expongas este puerto a Internet
 
 [entryPoints]
 
@@ -20,10 +20,10 @@
 
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]
+    [entryPoints.websecure.http.tls]  # Habilita TLS para este entrypoint
 
   [entryPoints.traefik]
-    address = ":8080"  # ✅ Cambiado de 127.0.0.1 a :8080 para que Docker escuche correctamente
+    address = ":8080"  # ✅ Permitimos acceso desde el servidor físico (no solo localhost)
 
 [providers]
 
