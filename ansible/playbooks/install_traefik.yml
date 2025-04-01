@@ -96,6 +96,17 @@
         content: "{}"
         mode: "0600"
 
+    - name: Esperar que el API Server esté listo
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: kubectl get --raw /healthz
+      register: k8s_api_health
+      until: k8s_api_health.stdout == "ok"
+      retries: 10
+      delay: 5
+      changed_when: false
+      ignore_errors: true
+
     - name: Eliminar ServiceAccount y ClusterRoleBinding previos si existen
       delegate_to: "{{ master1_ip }}"
       run_once: true
@@ -106,20 +117,20 @@
     - name: Crear ServiceAccount para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      raw: |
-        kubectl create sa traefik-sa --namespace default || true
+      raw: kubectl create sa traefik-sa --namespace default || true
 
-    - name: Crear ClusterRoleBinding para traefik-sa
+    - name: Crear ClusterRoleBinding para traefik-sa si no existe
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+        kubectl get clusterrolebinding traefik-sa-crb || \
+        kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+      changed_when: false
 
     - name: Obtener token moderno (JWT) del ServiceAccount traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      raw: |
-        kubectl -n default create token traefik-sa
+      raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
@@ -159,4 +170,4 @@
 
     - name: Mostrar estado del contenedor Traefik
       debug:
-        msg: "{{ traefik_status.stdout_lines }}"
+        msg: "{{ traefik_status.stdout_lines }}
