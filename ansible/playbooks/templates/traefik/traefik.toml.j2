@@ -13,13 +13,11 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-  namespaces = ["default", "kube-system", "traefik"]
+  # El token ya está montado como archivo en /var/run/secrets/kubernetes.io/serviceaccount/token
+  # No es necesario especificar tokenFile aquí
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
-  tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-  namespaces = ["default", "kube-system", "traefik"]
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
@@ -34,7 +32,7 @@
 
 [certificatesResolvers.default]
   [certificatesResolvers.default.acme]
-    email = "admin@example.com"
+    email = "admin@cefaslocalserver.com"
     storage = "/etc/traefik/acme.json"
     caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
     [certificatesResolvers.default.acme.httpChallenge]
