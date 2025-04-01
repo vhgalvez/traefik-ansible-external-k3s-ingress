@@ -15,20 +15,18 @@ services:
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
       - "{{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro"
+      - "{{ traefik_config_dir }}/certs/server-ca.crt:/etc/traefik/server-ca.crt:ro"
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.traefik.address=:8080
-      - --entrypoints.web.http.redirections.entryPoint.to=websecure
-      - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --providers.docker=true
       - --providers.kubernetesIngress=true
-      - --providers.kubernetesIngress.endpoint=https://{{ vip }}:6443
-      - --providers.kubernetesIngress.tls.ca=/etc/traefik/certs/server-ca.crt
       - --providers.kubernetesCRD=true
-      - --providers.kubernetesCRD.endpoint=https://{{ vip }}:6443
-      - --providers.kubernetesCRD.tls.ca=/etc/traefik/certs/server-ca.crt
       - --providers.file.directory=/etc/traefik/dynamic_conf
       - --providers.file.watch=true
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --serversTransport.rootCAs=/etc/traefik/server-ca.crt
       - --log.level=DEBUG
