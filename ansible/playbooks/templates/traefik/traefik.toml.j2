@@ -20,12 +20,10 @@
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
-  serversTransport = "default"
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
-  serversTransport = "default"
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
