@@ -170,4 +170,4 @@
 
     - name: Mostrar estado del contenedor Traefik
       debug:
-        msg: "{{ traefik_status.stdout_lines }}
+        msg: "{{ traefik_status.stdout_lines }}"
