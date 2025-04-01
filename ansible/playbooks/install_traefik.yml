@@ -115,7 +115,7 @@
       vars:
         traefik_token: "{{ sa_token.stdout }}"
         vip: "{{ k8s_api_vip }}"
-      when: "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token')" # Solo genera traefik.toml si el token existe
+      when: "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token') | default('TOKEN_NOT_FOUND')"
 
     - name: 🐳 Generar archivo docker-compose.yml
       template:
