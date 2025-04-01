@@ -1,5 +1,5 @@
 ---
-- name:  Instalar y Configurar Traefik como Ingress Controller usando Docker
+- name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
 
@@ -10,7 +10,7 @@
     master1_ip: "10.17.4.21"
 
   tasks:
-    - name:  Copiar certificado CA del API server desde master1
+    - name: Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
@@ -20,10 +20,10 @@
     - name: Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
-        dest: "{{ traefik_config_dir }}/server-ca.crt"
+        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name:  Eliminar Podman y herramientas relacionadas
+    - name: Eliminar Podman y herramientas relacionadas
       package:
         name:
           - podman
@@ -32,7 +32,7 @@
         state: absent
       ignore_errors: true
 
-    - name:  Eliminar carpetas de contenedores si existen
+    - name: Eliminar carpetas de contenedores si existen
       file:
         path: "{{ item }}"
         state: absent
@@ -41,7 +41,7 @@
         - /etc/containers
       ignore_errors: true
 
-    - name:  Instalar Docker CE y plugin docker compose
+    - name: Instalar Docker CE y plugin docker compose
       package:
         name:
           - docker-ce
@@ -56,7 +56,7 @@
         enabled: true
         state: started
 
-    - name:  Crear directorios para Traefik
+    - name: Crear directorios para Traefik
       file:
         path: "{{ item }}"
         state: directory
@@ -66,7 +66,7 @@
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
 
-    - name:  Copiar certificados TLS
+    - name: Copiar certificados TLS
       copy:
         src: "files/certs/traefik.local.{{ item }}"
         dest: "{{ traefik_config_dir }}/certs/traefik.local.{{ item }}"
@@ -75,19 +75,19 @@
         - crt
         - key
 
-    - name:  Eliminar traefik.toml si es un directorio por error
+    - name: Eliminar traefik.toml si es un directorio por error
       file:
         path: "{{ traefik_config_dir }}/traefik.toml"
         state: absent
         force: true
 
-    - name:  Crear archivo acme.json
+    - name: Crear archivo acme.json
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
 
-    - name:  Intentar obtener token de K3s si existe
+    - name: Intentar obtener token de K3s si existe
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
@@ -99,7 +99,7 @@
       register: sa_token
       changed_when: false
 
-    - name:  Guardar token si fue encontrado
+    - name: Guardar token si fue encontrado
       raw: |
         if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
           echo "{{ sa_token.stdout | trim }}" > {{ traefik_token_path }}
@@ -122,7 +122,7 @@
         vip: "{{ k8s_api_vip }}"
       when: token_file.stat is defined and "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token')"
 
-    - name:  Generar archivo docker-compose.yml
+    - name: Generar archivo docker-compose.yml
       template:
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
@@ -130,7 +130,7 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
-    - name:  Lanzar o reiniciar contenedor Traefik
+    - name: Lanzar o reiniciar contenedor Traefik
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
@@ -141,6 +141,6 @@
       shell: docker ps -a | grep traefik
       register: traefik_status
 
-    - name:  Mostrar estado del contenedor Traefik
+    - name: Mostrar estado del contenedor Traefik
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
