@@ -12,6 +12,7 @@
     vip: 10.17.5.10
 
   tasks:
+
     - name: 🐍 Instalar Python 3 y pip en AlmaLinux
       package:
         name:
@@ -19,11 +20,10 @@
           - python3-pip
         state: present
 
-    - name: 🔥 Eliminar podman y herramientas relacionadas si existen
+    - name: 🔥 Eliminar podman y herramientas relacionadas
       block:
         - name: 🛑 Detener contenedores Podman si existen
-          ansible.builtin.shell: |
-            podman ps -q | xargs -r podman stop
+          shell: podman ps -q | xargs -r podman stop
           ignore_errors: true
 
         - name: ❌ Desinstalar podman y buildah
@@ -34,7 +34,7 @@
             state: absent
           ignore_errors: true
 
-        - name: 🧹 Eliminar datos residuales de podman
+        - name: 🧹 Eliminar directorios de podman
           file:
             path: "{{ item }}"
             state: absent
@@ -53,22 +53,22 @@
         - name: 🔥 Eliminar Docker existente (si está presente)
           when: docker_check.rc == 0
           block:
-            - name: 🛑 Detener Docker si está en ejecución
+            - name: 🛑 Detener Docker
               systemd:
                 name: docker
                 state: stopped
               ignore_errors: true
 
-            - name: ❌ Desinstalar paquetes Docker
+            - name: ❌ Desinstalar Docker
               package:
                 name:
                   - docker-ce
                   - docker-ce-cli
                   - containerd.io
-              state: absent
+                state: absent
               ignore_errors: true
 
-            - name: 🧹 Eliminar directorios relacionados
+            - name: 🧹 Eliminar archivos y sockets Docker
               file:
                 path: "{{ item }}"
                 state: absent
@@ -78,7 +78,7 @@
                 - /var/run/docker.sock
               ignore_errors: true
 
-        - name: 🔧 Instalar dependencias para Docker
+        - name: 📦 Instalar dependencias para Docker
           package:
             name:
               - yum-utils
@@ -86,12 +86,12 @@
               - lvm2
             state: present
 
-        - name: 📦 Añadir repositorio oficial de Docker (CentOS compatible)
+        - name: 📥 Agregar repo oficial Docker (CentOS compatible)
           get_url:
             url: https://download.docker.com/linux/centos/docker-ce.repo
             dest: /etc/yum.repos.d/docker-ce.repo
 
-        - name: 📦 Instalar Docker CE
+        - name: 🐳 Instalar Docker CE
           package:
             name:
               - docker-ce
@@ -99,20 +99,20 @@
               - containerd.io
             state: present
 
-        - name: ▶️ Habilitar y arrancar el servicio Docker
+        - name: ▶️ Habilitar y arrancar Docker
           systemd:
             name: docker
             state: started
             enabled: true
 
-    - name: 📦 Instalar Docker SDK y docker-compose con pip
+    - name: 📦 Instalar Docker SDK y docker-compose
       pip:
         name:
           - docker==5.0.3
           - docker-compose==1.29.2
         executable: pip3
 
-    - name: 📁 Crear directorios Traefik
+    - name: 📁 Crear directorios para Traefik
       file:
         path: "{{ item }}"
         state: directory
@@ -121,6 +121,12 @@
         - "{{ traefik_dir }}"
         - "{{ traefik_dir }}/certs"
         - "{{ traefik_dir }}/dynamic_conf"
+
+    - name: 🧨 Eliminar traefik.toml si es un directorio por error
+      file:
+        path: "{{ traefik_dir }}/traefik.toml"
+        state: absent
+      when: ansible_facts['os_family'] is defined
 
     - name: 📄 Copiar certificados TLS
       copy:
@@ -153,13 +159,19 @@
         dest: "{{ traefik_token_path }}"
         mode: "0600"
 
-    - name: 📦 Copiar archivo .env con token y configuración
+    - name: 🧬 Copiar archivo .env con token y config
       template:
         src: templates/traefik/env.j2
         dest: "{{ traefik_dir }}/.env"
         mode: "0644"
 
-    - name: 🐳 Generar docker-compose.yml para Traefik
+    - name: ⚙️ Generar traefik.toml
+      template:
+        src: templates/traefik/traefik.toml.j2
+        dest: "{{ traefik_dir }}/traefik.toml"
+        mode: "0644"
+
+    - name: 🐳 Generar docker-compose.yml
       template:
         src: templates/traefik/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
@@ -170,12 +182,12 @@
         path: /var/run/docker.sock
       register: docker_sock
 
-    - name: ❌ Fallar si Docker socket no existe
+    - name: ❌ Fallar si el socket no existe
       fail:
         msg: "❌ No se encontró /var/run/docker.sock. Docker no está disponible o no tiene permisos."
       when: not docker_sock.stat.exists
 
-    - name: 🚀 Lanzar contenedor Traefik con docker compose CLI
+    - name: 🚀 Lanzar Traefik
       shell: |
         docker compose -f {{ traefik_dir }}/docker-compose.yml --env-file {{ traefik_dir }}/.env up -d
       args:
