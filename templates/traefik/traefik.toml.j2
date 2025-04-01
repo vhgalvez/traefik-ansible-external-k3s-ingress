@@ -25,22 +25,19 @@
     address = ":8080"
 
 [providers]
-
   [providers.docker]
     endpoint = "unix:///var/run/docker.sock"
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    endpoint = "https://{{ vip }}:6443"
-    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     insecureSkipTLSVerify = true
     namespaces = ["default", "traefik"]
+    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
   [providers.kubernetesCRD]
-    endpoint = "https://{{ vip }}:6443"
-    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     insecureSkipTLSVerify = true
     namespaces = ["default", "traefik"]
+    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
