@@ -11,11 +11,11 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  token = "{{ lookup('file', '/etc/traefik/token') | trim }}" # Leer el token directamente desde el archivo
+  token = "{{ traefik_token | trim }}"
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
-  token = "{{ lookup('file', '/etc/traefik/token') | trim }}" # Leer el token directamente desde el archivo
+  token = "{{ traefik_token | trim }}"
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
@@ -35,6 +35,6 @@
   [certificatesResolvers.default.acme]
     email = "admin@cefaslocalserver.com"
     storage = "/etc/traefik/acme.json"
-    caServer = "https://acme-v02.api.letsencrypt.org/directory" # Producción
+    caServer = "https://acme-v02.api.letsencrypt.org/directory"
     [certificatesResolvers.default.acme.httpChallenge]
       entryPoint = "web"
