@@ -108,11 +108,27 @@
       raw: |
         kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: Crear token JWT del ServiceAccount traefik-sa
+    - name: Obtener nombre del Secret asociado al ServiceAccount traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl create token traefik-sa
+        kubectl -n default get sa traefik-sa -o jsonpath="{.secrets[0].name}"
+      register: sa_secret_name
+      changed_when: false
+
+    - name: Obtener token codificado en base64 del Secret
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl -n default get secret {{ sa_secret_name.stdout }} -o jsonpath="{.data.token}"
+      register: encoded_token
+      changed_when: false
+
+    - name: Decodificar token
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      shell: |
+        echo "{{ encoded_token.stdout }}" | base64 -d
       register: sa_token_jwt
       changed_when: false
 
