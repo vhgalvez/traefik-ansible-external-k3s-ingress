@@ -1,65 +1,41 @@
-[global]
-  checkNewVersion = true
-  sendAnonymousUsage = false
-
-[log]
-  level = "DEBUG"
-
-[api]
-  dashboard = true
-  insecure = true
-
 [entryPoints]
   [entryPoints.web]
     address = ":80"
-    [entryPoints.web.http.redirections.entryPoint]
-      to = "websecure"
-      scheme = "https"
-      permanent = true
 
   [entryPoints.websecure]
     address = ":443"
-    [entryPoints.websecure.http.tls]
 
   [entryPoints.traefik]
     address = ":8080"
 
-[providers]
-  [providers.docker]
-    endpoint = "unix:///var/run/docker.sock"
-    exposedByDefault = false
+[api]
+  dashboard = true
 
-  [providers.kubernetesIngress]
-    insecureSkipTLSVerify = true
-    namespaces = ["default", "traefik"]
-    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+[providers.kubernetesIngress]
+  endpoint = "https://{{ vip }}:6443"
+  tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  namespaces = ["default", "kube-system", "traefik"]
 
-  [providers.kubernetesCRD]
-    insecureSkipTLSVerify = true
-    namespaces = ["default", "traefik"]
-    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+[providers.kubernetesCRD]
+  endpoint = "https://{{ vip }}:6443"
+  tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  namespaces = ["default", "kube-system", "traefik"]
 
-  [providers.file]
-    directory = "/etc/traefik/dynamic_conf/"
-    watch = true
+[providers.docker]
+  endpoint = "unix:///var/run/docker.sock"
+  exposedByDefault = false
 
-[tls]
-  [tls.stores]
-    [tls.stores.default]
-      [tls.stores.default.defaultCertificate]
-        certFile = "/etc/traefik/certs/traefik.local.crt"
-        keyFile  = "/etc/traefik/certs/traefik.local.key"
+[providers.file]
+  directory = "/etc/traefik/dynamic_conf"
+  watch = true
 
-  [tls.options]
-    [tls.options.default]
-      minVersion = "VersionTLS12"
-      maxVersion = "VersionTLS13"
-      cipherSuites = [
-        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-        "TLS_AES_128_GCM_SHA256",
-        "TLS_AES_256_GCM_SHA384"
-      ]
+[log]
+  level = "DEBUG"
 
-[ping]
-  entryPoint = "traefik"
+[certificatesResolvers.default]
+  [certificatesResolvers.default.acme]
+    email = "admin@example.com"
+    storage = "/etc/traefik/acme.json"
+    caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+    [certificatesResolvers.default.acme.httpChallenge]
+      entryPoint = "web"
