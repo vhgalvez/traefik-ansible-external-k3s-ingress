@@ -2,17 +2,17 @@
 - name: 🚀 Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
-  gather_facts: false
 
   vars:
-    traefik_dir: /etc/traefik
-    traefik_config_dir: /etc/traefik
-    traefik_token_path: "{{ traefik_dir }}/token"
-    master1_ip: 10.17.4.21
-    vip: 10.17.5.10
+    traefik_config_dir: "/etc/traefik"
+    traefik_token_path: "/etc/traefik/token"
+    traefik_env_path: "/etc/traefik/.env"
+    k8s_api_vip: "10.17.5.10"
+    master1_ip: "10.17.4.21"
+    token_path: "/etc/rancher/k3s/k3s.yaml"
+    k3s_service_path: "/etc/systemd/system/k3s.service"
 
   tasks:
-
     - name: 🐍 Instalar Python 3 y pip en AlmaLinux
       package:
         name:
@@ -20,97 +20,38 @@
           - python3-pip
         state: present
 
-    - name: 🔥 Eliminar podman y herramientas relacionadas
-      block:
-        - name: 🛑 Detener contenedores Podman si existen
-          shell: podman ps -q | xargs -r podman stop
-          ignore_errors: true
-
-        - name: ❌ Desinstalar podman y buildah
-          package:
-            name:
-              - podman
-              - buildah
-            state: absent
-          ignore_errors: true
-
-        - name: 🧹 Eliminar directorios de podman
-          file:
-            path: "{{ item }}"
-            state: absent
-          loop:
-            - /var/lib/containers
-            - /etc/containers
-          ignore_errors: true
-
-    - name: 🐳 Instalar Docker en AlmaLinux
-      block:
-        - name: 🔍 Verificar si Docker ya está instalado
-          command: which docker
-          register: docker_check
-          ignore_errors: true
-
-        - name: 🔥 Eliminar Docker existente (si está presente)
-          when: docker_check.rc == 0
-          block:
-            - name: 🛑 Detener Docker
-              systemd:
-                name: docker
-                state: stopped
-              ignore_errors: true
-
-            - name: ❌ Desinstalar Docker
-              package:
-                name:
-                  - docker-ce
-                  - docker-ce-cli
-                  - containerd.io
-                state: absent
-              ignore_errors: true
-
-            - name: 🧹 Eliminar archivos y sockets Docker
-              file:
-                path: "{{ item }}"
-                state: absent
-              loop:
-                - /var/lib/docker
-                - /etc/docker
-                - /var/run/docker.sock
-              ignore_errors: true
-
-        - name: 📦 Instalar dependencias para Docker
-          package:
-            name:
-              - yum-utils
-              - device-mapper-persistent-data
-              - lvm2
-            state: present
-
-        - name: 📥 Agregar repo oficial Docker (CentOS compatible)
-          get_url:
-            url: https://download.docker.com/linux/centos/docker-ce.repo
-            dest: /etc/yum.repos.d/docker-ce.repo
-
-        - name: 🐳 Instalar Docker CE
-          package:
-            name:
-              - docker-ce
-              - docker-ce-cli
-              - containerd.io
-            state: present
-
-        - name: ▶️ Habilitar y arrancar Docker
-          systemd:
-            name: docker
-            state: started
-            enabled: true
-
-    - name: 📦 Instalar Docker SDK y docker-compose
-      pip:
+    - name: 🔥 Eliminar Podman y herramientas relacionadas
+      package:
         name:
-          - docker==5.0.3
-          - docker-compose==1.29.2
-        executable: pip3
+          - podman
+          - podman-docker
+          - buildah
+        state: absent
+      ignore_errors: true
+
+    - name: 🧹 Eliminar carpetas de contenedores si existen
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/containers
+        - /etc/containers
+      ignore_errors: true
+
+    - name: 🐳 Instalar Docker CE y plugin docker compose
+      package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: ▶️ Habilitar y arrancar Docker
+      systemd:
+        name: docker
+        enabled: true
+        state: started
 
     - name: 📁 Crear directorios para Traefik
       file:
@@ -118,77 +59,98 @@
         state: directory
         mode: "0755"
       loop:
-        - "{{ traefik_dir }}"
-        - "{{ traefik_dir }}/certs"
-        - "{{ traefik_dir }}/dynamic_conf"
-
-    - name: 🧨 Eliminar traefik.toml si es un directorio por error
-      file:
-        path: "{{ traefik_dir }}/traefik.toml"
-        state: absent
-      when: ansible_facts['os_family'] is defined
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/certs"
+        - "{{ traefik_config_dir }}/dynamic_conf"
 
     - name: 📄 Copiar certificados TLS
       copy:
         src: "files/certs/traefik.local.{{ item }}"
-        dest: "{{ traefik_dir }}/certs/traefik.local.{{ item }}"
+        dest: "{{ traefik_config_dir }}/certs/traefik.local.{{ item }}"
         mode: "0644"
       loop:
         - crt
         - key
 
-    - name: 🛡️ Crear ServiceAccount para Traefik
-      delegate_to: "{{ master1_ip }}"
-      raw: |
-        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+    - name: 🧹 Eliminar traefik.toml si es un directorio por error
+      file:
+        path: "{{ traefik_config_dir }}/traefik.toml"
+        state: absent
+        force: true
 
-    - name: 🔐 Crear ClusterRoleBinding para Traefik
-      delegate_to: "{{ master1_ip }}"
-      raw: |
-        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+    - name: 📄 Crear archivo acme.json
+      copy:
+        dest: "{{ traefik_config_dir }}/acme.json"
+        content: "{}"
+        mode: "0600"
 
-    - name: 🔑 Obtener token del ServiceAccount
-      delegate_to: "{{ master1_ip }}"
-      raw: |
-        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system get secret $(kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}") -o jsonpath="{.data.token}" | base64 -d
-      register: sa_token
+    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding + Obtener token
+      delegate_to: localhost
+      run_once: true
+      become: false
+      block:
+        - name: 🛡️ Crear ServiceAccount para Traefik en master1
+          delegate_to: "{{ master1_ip }}"
+          raw: |
+            kubectl --kubeconfig={{ token_path }} -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: 💾 Guardar token en archivo
+        - name: 🔐 Crear ClusterRoleBinding para Traefik
+          delegate_to: "{{ master1_ip }}"
+          raw: |
+            kubectl --kubeconfig={{ token_path }} create clusterrolebinding traefik-ingress-controller \
+              --clusterrole=cluster-admin \
+              --serviceaccount=kube-system:traefik-ingress-controller \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+        - name: 🔑 Obtener token del ServiceAccount
+          delegate_to: "{{ master1_ip }}"
+          raw: |
+            kubectl --kubeconfig={{ token_path }} -n kube-system get secret $(kubectl --kubeconfig={{ token_path }} -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}") \
+            -o jsonpath="{.data.token}" | base64 -d
+          register: sa_token
+
+    - name: 📂 Guardar token en archivo
       copy:
         content: "{{ sa_token.stdout }}"
         dest: "{{ traefik_token_path }}"
         mode: "0600"
 
-    - name: 🧬 Copiar archivo .env con token y config
-      template:
-        src: templates/traefik/env.j2
-        dest: "{{ traefik_dir }}/.env"
-        mode: "0644"
-
     - name: ⚙️ Generar traefik.toml
       template:
-        src: templates/traefik/traefik.toml.j2
-        dest: "{{ traefik_dir }}/traefik.toml"
+        src: "../../templates/traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
+      vars:
+        traefik_token: "{{ sa_token.stdout }}"
+        vip: "{{ k8s_api_vip }}"
 
-    - name: 🐳 Generar docker-compose.yml
+    - name: ⚙️ Generar archivo .env
       template:
-        src: templates/traefik/docker-compose.yml.j2
-        dest: "{{ traefik_dir }}/docker-compose.yml"
+        src: "../../templates/traefik/env.j2"
+        dest: "{{ traefik_env_path }}"
+        mode: "0644"
+      vars:
+        vip: "{{ k8s_api_vip }}"
+        traefik_dir: "{{ traefik_config_dir }}"
+        traefik_token_path: "{{ traefik_token_path }}"
+
+    - name: 🐳 Generar archivo docker-compose.yml
+      template:
+        src: "../../templates/traefik/docker-compose.yml.j2"
+        dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
-    - name: 🔍 Verificar existencia del socket Docker
-      stat:
-        path: /var/run/docker.sock
-      register: docker_sock
-
-    - name: ❌ Fallar si el socket no existe
-      fail:
-        msg: "❌ No se encontró /var/run/docker.sock. Docker no está disponible o no tiene permisos."
-      when: not docker_sock.stat.exists
-
-    - name: 🚀 Lanzar Traefik
+    - name: 🚀 Lanzar o reiniciar contenedor Traefik
       shell: |
-        docker compose -f {{ traefik_dir }}/docker-compose.yml --env-file {{ traefik_dir }}/.env up -d
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml --env-file {{ traefik_env_path }} down || true
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml --env-file {{ traefik_env_path }} up -d
       args:
         executable: /bin/bash
+
+    - name: ✅ Verificar estado del contenedor Traefik
+      shell: docker ps -a | grep traefik
+      register: traefik_status
+
+    - name: 📋 Mostrar estado del contenedor Traefik
+      debug:
+        msg: "{{ traefik_status.stdout_lines }}"
