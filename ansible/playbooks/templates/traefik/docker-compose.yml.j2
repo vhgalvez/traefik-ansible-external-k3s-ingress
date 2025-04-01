@@ -15,7 +15,6 @@ services:
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
       - "{{ traefik_token_path }}:/etc/traefik/token:ro"
-
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80
@@ -28,5 +27,5 @@ services:
       - --providers.file.watch=true
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
-      - --serversTransport.rootCAs=/etc/traefik/server-ca.crt
+      - --serversTransport.rootCAs=/etc/traefik/certs/server-ca.crt
       - --log.level=DEBUG
