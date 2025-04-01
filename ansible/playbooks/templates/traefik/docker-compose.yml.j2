@@ -14,8 +14,8 @@ services:
       - "{{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro"
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
-      - "{{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro"
       - "{{ traefik_config_dir }}/certs/server-ca.crt:/etc/traefik/server-ca.crt:ro"
+      - "{{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro"
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80
@@ -30,3 +30,5 @@ services:
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --serversTransport.rootCAs=/etc/traefik/server-ca.crt
       - --log.level=DEBUG
+      - --providers.kubernetesIngress.tokenFile=/var/run/secrets/kubernetes.io/serviceaccount/token
+      - --providers.kubernetesCRD.tokenFile=/var/run/secrets/kubernetes.io/serviceaccount/token
