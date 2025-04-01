@@ -96,23 +96,46 @@
         content: "{}"
         mode: "0600"
 
-    - name: Crear ServiceAccount para Traefik si no existe
+    - name: Eliminar ServiceAccount y ClusterRoleBinding previos si existen
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl get sa traefik-sa --namespace default || kubectl create sa traefik-sa --namespace default
+        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true
+        kubectl delete sa traefik-sa -n default --ignore-not-found=true
 
-    - name: Crear ClusterRoleBinding para traefik-sa si no existe
+    - name: Crear ServiceAccount para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+        kubectl create sa traefik-sa --namespace default
 
-    - name: Obtener token moderno (JWT) del ServiceAccount traefik-sa
+    - name: Crear ClusterRoleBinding para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl -n default create token traefik-sa
+        kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+
+    - name: Obtener nombre del Secret asociado al ServiceAccount traefik-sa
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl -n default get sa traefik-sa -o jsonpath="{.secrets[0].name}"
+      register: sa_secret_name
+      changed_when: false
+
+    - name: Obtener token codificado en base64 del Secret
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl -n default get secret {{ sa_secret_name.stdout }} -o jsonpath="{.data.token}"
+      register: encoded_token
+      changed_when: false
+
+    - name: Decodificar token en el nodo local (controlador)
+      run_once: true
+      delegate_to: localhost
+      shell: |
+        echo "{{ encoded_token.stdout }}" | base64 -d
       register: sa_token_jwt
       changed_when: false
 
