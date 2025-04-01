@@ -33,12 +33,12 @@
         mode: "0644"
 
     - name: Asegurar que el certificado raíz existe
-      ansible.builtin.stat:
+      stat:
         path: "{{ traefik_config_dir }}/certs/server-ca.crt"
       register: cert_check
 
     - name: Fallar si el certificado raíz no existe
-      ansible.builtin.fail:
+      fail:
         msg: "El archivo server-ca.crt no se encuentra en {{ traefik_config_dir }}/certs"
       when: not cert_check.stat.exists
 
@@ -108,27 +108,11 @@
       raw: |
         kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: Obtener nombre del Secret asociado al ServiceAccount traefik-sa
+    - name: Obtener token moderno (JWT) del ServiceAccount traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl -n default get sa traefik-sa -o jsonpath="{.secrets[0].name}"
-      register: sa_secret_name
-      changed_when: false
-
-    - name: Obtener token codificado en base64 del Secret
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: |
-        kubectl -n default get secret {{ sa_secret_name.stdout }} -o jsonpath="{.data.token}"
-      register: encoded_token
-      changed_when: false
-
-    - name: Decodificar token en el nodo local (controlador)
-      run_once: true
-      delegate_to: localhost
-      shell: |
-        echo "{{ encoded_token.stdout }}" | base64 -d
+        kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
