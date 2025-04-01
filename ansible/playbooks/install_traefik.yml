@@ -119,6 +119,9 @@
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
+      vars:
+        vip: "{{ k8s_api_vip }}"
+
 
     - name: 🚀 Lanzar o reiniciar contenedor Traefik
       shell: |
