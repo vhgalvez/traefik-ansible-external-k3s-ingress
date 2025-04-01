@@ -82,13 +82,14 @@
         content: "{}"
         mode: "0600"
 
-    - name: 📥 Copiar kubeconfig desde master1 a localhost
-      delegate_to: localhost
+    - name: 📥 Copiar kubeconfig temporal desde master1 a localhost
       become: false
       run_once: true
-      shell: |
-        scp -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa core@{{ master1_ip }}:/etc/rancher/k3s/k3s.yaml /tmp/kubeconfig-traefik
-      register: kubeconfig_copied
+      delegate_to: "{{ master1_ip }}"
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: /tmp/kubeconfig-traefik
+        flat: true
 
     - name: 🔐 Crear ServiceAccount y ClusterRoleBinding + Obtener token
       delegate_to: localhost
