@@ -11,12 +11,12 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  token = "{{ lookup('file', traefik_token_path) }}"
   certAuthFilePath = "/etc/traefik/server-ca.crt"
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
-  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  token = "{{ lookup('file', traefik_token_path) }}"
   certAuthFilePath = "/etc/traefik/server-ca.crt"
 
 [providers.docker]
@@ -40,7 +40,3 @@
     caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
     [certificatesResolvers.default.acme.httpChallenge]
       entryPoint = "web"
-
-[entryPoints.web.http.redirections.entryPoint]
-  to = "websecure"
-  scheme = "https"
