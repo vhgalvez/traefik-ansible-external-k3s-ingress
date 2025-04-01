@@ -100,20 +100,20 @@
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true
-        kubectl delete sa traefik-sa -n default --ignore-not-found=true
+        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
+        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
 
     - name: Crear ServiceAccount para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl create sa traefik-sa --namespace default
+        kubectl create sa traefik-sa --namespace default || true
 
     - name: Crear ClusterRoleBinding para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+        kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
     - name: Obtener token moderno (JWT) del ServiceAccount traefik-sa
       delegate_to: "{{ master1_ip }}"
@@ -154,7 +154,7 @@
         executable: /bin/bash
 
     - name: ✅ Verificar estado del contenedor Traefik
-      shell: docker ps -a | grep traefik
+      shell: docker ps -a | grep traefik || true
       register: traefik_status
 
     - name: Mostrar estado del contenedor Traefik
