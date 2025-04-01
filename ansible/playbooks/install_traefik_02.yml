@@ -87,35 +87,30 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🔐 Crear token JWT para Traefik con ServiceAccount
+    - name: Intentar obtener token de K3s si existe
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      block:
-        - name: Crear ServiceAccount para Traefik si no existe
-          command: kubectl get serviceaccount traefik-sa || kubectl create serviceaccount traefik-sa
-          changed_when: false
-          failed_when: false
+      raw: |
+        if [ -f /var/lib/rancher/k3s/server/token ]; then
+          cat /var/lib/rancher/k3s/server/token
+        else
+          echo "TOKEN_NOT_FOUND"
+        fi
+      register: sa_token
+      changed_when: false
 
-        - name: Crear ClusterRoleBinding para traefik-sa si no existe
-          command: kubectl get clusterrolebinding traefik-sa-binding || \
-                   kubectl create clusterrolebinding traefik-sa-binding \
-                   --clusterrole=cluster-admin \
-                   --serviceaccount=default:traefik-sa
-          changed_when: false
-          failed_when: false
+    - name: Guardar token si fue encontrado
+      raw: |
+        if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
+          echo "{{ sa_token.stdout | trim }}" > {{ traefik_token_path }}
+        else
+          echo "TOKEN_NOT_FOUND" > {{ traefik_token_path }} # Crea el fichero aunque no encuentre el token.
+        fi
 
-        - name: Crear token JWT del ServiceAccount traefik-sa
-          command: kubectl create token traefik-sa
-          register: traefik_jwt_token
-
-    - name: Guardar token JWT en los balanceadores
-      delegate_to: "{{ item }}"
-      become: true
-      copy:
-        content: "{{ traefik_jwt_token.stdout }}"
-        dest: "{{ traefik_token_path }}"
-        mode: "0600"
-      loop: "{{ groups['load_balancers'] }}"
+    - name: Verificar si el fichero token existe.
+      stat:
+        path: /etc/traefik/token
+      register: token_file
 
     - name: ⚙️ Generar traefik.toml
       template:
@@ -123,8 +118,9 @@
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
       vars:
-        traefik_token: "{{ traefik_jwt_token.stdout }}"
+        traefik_token: "{{ sa_token.stdout }}"
         vip: "{{ k8s_api_vip }}"
+      when: token_file.stat is defined and "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token')"
 
     - name: Generar archivo docker-compose.yml
       template:
