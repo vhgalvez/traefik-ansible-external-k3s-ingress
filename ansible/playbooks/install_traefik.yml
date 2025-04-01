@@ -103,6 +103,8 @@
       raw: |
         if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
           echo "{{ sa_token.stdout | trim }}" > {{ traefik_token_path }}
+        else
+          echo "TOKEN_NOT_FOUND" > {{ traefik_token_path }} # Crea el fichero aunque no encuentre el token.
         fi
 
     - name: ⚙️ Generar traefik.toml
@@ -113,6 +115,7 @@
       vars:
         traefik_token: "{{ sa_token.stdout }}"
         vip: "{{ k8s_api_vip }}"
+      when: "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token')" # Solo genera traefik.toml si el token existe
 
     - name: 🐳 Generar archivo docker-compose.yml
       template:
