@@ -19,18 +19,67 @@
           - python3-pip
         state: present
 
-    - name: 🐳 Instalar Docker si no está presente
-      raw: |
-        if ! command -v docker &> /dev/null; then
-          curl -fsSL https://get.docker.com | sh
-          systemctl enable docker
-          systemctl start docker
-        fi
+    - name: 🐳 Instalar Docker en AlmaLinux si no está presente
+      block:
+        - name: 🔍 Verificar si Docker ya está instalado
+          command: which docker
+          register: docker_check
+          ignore_errors: true
 
-    - name: 🧪 Verificar que el binario docker esté disponible
-      command: which docker
-      register: docker_check
-      failed_when: docker_check.rc != 0
+        - name: 🔥 Eliminar Docker existente (si está presente)
+          when: docker_check.rc == 0
+          block:
+            - name: 🛑 Detener Docker si está en ejecución
+              systemd:
+                name: docker
+                state: stopped
+              ignore_errors: true
+
+            - name: ❌ Desinstalar paquetes Docker
+              package:
+                name:
+                  - docker-ce
+                  - docker-ce-cli
+                  - containerd.io
+                state: absent
+              ignore_errors: true
+
+            - name: 🧹 Eliminar directorios relacionados
+              file:
+                path: "{{ item }}"
+                state: absent
+              loop:
+                - /var/lib/docker
+                - /etc/docker
+                - /var/run/docker.sock
+              ignore_errors: true
+
+        - name: 🔧 Instalar dependencias para Docker
+          package:
+            name:
+              - yum-utils
+              - device-mapper-persistent-data
+              - lvm2
+            state: present
+
+        - name: 📦 Añadir repositorio oficial de Docker (CentOS compatible)
+          get_url:
+            url: https://download.docker.com/linux/centos/docker-ce.repo
+            dest: /etc/yum.repos.d/docker-ce.repo
+
+        - name: 📦 Instalar Docker CE
+          package:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+
+        - name: ▶️ Habilitar y arrancar el servicio Docker
+          systemd:
+            name: docker
+            state: started
+            enabled: true
 
     - name: 📦 Instalar versiones compatibles de Docker SDK y docker-compose
       pip:
@@ -91,6 +140,16 @@
         src: templates/traefik/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
         mode: "0644"
+
+    - name: 🔍 Verificar existencia del socket Docker
+      stat:
+        path: /var/run/docker.sock
+      register: docker_sock
+
+    - name: ❌ Fallar si Docker socket no existe
+      fail:
+        msg: "❌ No se encontró /var/run/docker.sock. Docker no está disponible o no tiene permisos."
+      when: not docker_sock.stat.exists
 
     - name: 🚀 Lanzar contenedor Traefik con docker compose CLI
       ansible.builtin.shell: |
