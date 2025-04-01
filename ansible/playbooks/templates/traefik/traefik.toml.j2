@@ -1,10 +1,8 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
-
   [entryPoints.websecure]
     address = ":443"
-
   [entryPoints.traefik]
     address = ":8080"
 
@@ -13,8 +11,6 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  # El token ya está montado como archivo en /var/run/secrets/kubernetes.io/serviceaccount/token
-  # No es necesario especificar tokenFile aquí
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
@@ -29,6 +25,9 @@
 
 [log]
   level = "DEBUG"
+
+[serversTransport]
+  rootCAs = ["/etc/traefik/server-ca.crt"]
 
 [certificatesResolvers.default]
   [certificatesResolvers.default.acme]
