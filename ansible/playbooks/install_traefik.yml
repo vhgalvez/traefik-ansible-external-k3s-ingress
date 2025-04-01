@@ -124,9 +124,9 @@
       register: encoded_token
       changed_when: false
 
-    - name: Decodificar token
-      delegate_to: "{{ master1_ip }}"
+    - name: Decodificar token en el nodo local (controlador)
       run_once: true
+      delegate_to: localhost
       shell: |
         echo "{{ encoded_token.stdout }}" | base64 -d
       register: sa_token_jwt
