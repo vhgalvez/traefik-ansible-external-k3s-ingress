@@ -30,5 +30,3 @@ services:
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --serversTransport.rootCAs=/etc/traefik/server-ca.crt
       - --log.level=DEBUG
-      - --providers.kubernetesIngress.tokenFile=/var/run/secrets/kubernetes.io/serviceaccount/token
-      - --providers.kubernetesCRD.tokenFile=/var/run/secrets/kubernetes.io/serviceaccount/token
