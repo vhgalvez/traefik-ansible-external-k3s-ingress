@@ -2,31 +2,17 @@ version: "3.9"
 
 services:
   traefik:
-    image: "traefik:v3.3"
+    image: traefik:v3.0
     container_name: traefik
-    restart: always
+    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "80:80"         # HTTP
+      - "443:443"       # HTTPS
+      - "8080:8080"     # Traefik Dashboard
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
-      - /etc/traefik/dynamic_conf:/etc/traefik/dynamic_conf:ro
+      - /etc/traefik/acme.json:/acme.json
       - /etc/traefik/certs:/etc/traefik/certs:ro
-      - /etc/traefik/token:/token:ro
-    command:
-      - --api.dashboard=true
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.traefik.address=:8080
-      - --providers.docker=true
-      - --providers.kubernetesIngress=true
-      - --providers.kubernetesCRD=true
-      - --providers.file.directory=/etc/traefik/dynamic_conf
-      - --providers.file.watch=true
-      - --entrypoints.web.http.redirections.entryPoint.to=websecure
-      - --entrypoints.web.http.redirections.entryPoint.scheme=https
-      - --serversTransport.rootCAs=/etc/traefik/certs/server-ca.crt
-      - --serversTransport.insecureSkipVerify=false
-      - --log.level=DEBUG
+      - /etc/traefik/token:/etc/traefik/token:ro
+    environment:
+      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false

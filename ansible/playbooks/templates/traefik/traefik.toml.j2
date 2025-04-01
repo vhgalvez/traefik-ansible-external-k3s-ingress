@@ -1,43 +1,25 @@
-[entryPoints.web]
-  address = ":80"
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
 
-[entryPoints.websecure]
-  address = ":443"
-
-[entryPoints.traefik]
-  address = ":8080"
+  [entryPoints.websecure]
+    address = ":443"
 
 [api]
   dashboard = true
+  insecure = false
 
 [log]
   level = "DEBUG"
 
-[serversTransport]
-  rootCAs = ["/etc/traefik/certs/server-ca.crt"]
-  insecureSkipVerify = false
-
 [providers.kubernetesIngress]
-  endpoint = "https://{{ vip }}:6443"
-  token = "{{ traefik_token | trim }}"
+  endpoint = "https://10.17.5.10:6443"
+  token = "/etc/traefik/token"
+  certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
+  namespaces = ["default"]
 
-[providers.kubernetesCRD]
-  endpoint = "https://{{ vip }}:6443"
-  token = "{{ traefik_token | trim }}"
-
-[providers.docker]
-  endpoint = "unix:///var/run/docker.sock"
-  exposedByDefault = false
-
-[providers.file]
-  directory = "/etc/traefik/dynamic_conf"
-  watch = true
-
-[certificatesResolvers.default]
-  [certificatesResolvers.default.acme]
-    email = "admin@cefaslocalserver.com"
-    storage = "/etc/traefik/acme.json"
-    caServer = "https://acme-v02.api.letsencrypt.org/directory"
-
-    [certificatesResolvers.default.acme.httpChallenge]
-      entryPoint = "web"
+[certificatesResolvers.default.acme]
+  email = "admin@example.com"
+  storage = "/acme.json"
+  [certificatesResolvers.default.acme.httpChallenge]
+    entryPoint = "web"
