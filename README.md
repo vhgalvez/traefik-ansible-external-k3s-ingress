@@ -97,6 +97,10 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 
 ---
 
+
+
+
+
 ### Playbook de Ansible traefik instalacion OK
 
 ![certifcados](docs/certifcados.png)
