@@ -19,6 +19,19 @@
           - python3-pip
         state: present
 
+    - name: 🐳 Instalar Docker si no está presente
+      raw: |
+        if ! command -v docker &> /dev/null; then
+          curl -fsSL https://get.docker.com | sh
+          systemctl enable docker
+          systemctl start docker
+        fi
+
+    - name: 🧪 Verificar que el binario docker esté disponible
+      command: which docker
+      register: docker_check
+      failed_when: docker_check.rc != 0
+
     - name: 📦 Instalar versiones compatibles de Docker SDK y docker-compose
       pip:
         name:
@@ -78,16 +91,6 @@
         src: templates/traefik/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
         mode: "0644"
-
-    - name: 🔍 Verificar existencia del socket Docker
-      stat:
-        path: /var/run/docker.sock
-      register: docker_sock
-
-    - name: ❌ Fallar si Docker socket no existe
-      fail:
-        msg: "❌ No se encontró /var/run/docker.sock. Docker no está disponible o no tiene permisos."
-      when: not docker_sock.stat.exists
 
     - name: 🚀 Lanzar contenedor Traefik con docker compose CLI
       ansible.builtin.shell: |
