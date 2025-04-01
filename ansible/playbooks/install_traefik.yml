@@ -87,35 +87,31 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🔐 Crear token JWT para Traefik con ServiceAccount
+    - name: Crear ServiceAccount para Traefik si no existe
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      block:
-        - name: Crear ServiceAccount para Traefik si no existe
-          command: kubectl get serviceaccount traefik-sa || kubectl create serviceaccount traefik-sa
-          changed_when: false
-          failed_when: false
+      raw: |
+        kubectl get sa traefik-sa --namespace default || kubectl create sa traefik-sa --namespace default
 
-        - name: Crear ClusterRoleBinding para traefik-sa si no existe
-          command: kubectl get clusterrolebinding traefik-sa-binding || \
-                   kubectl create clusterrolebinding traefik-sa-binding \
-                   --clusterrole=cluster-admin \
-                   --serviceaccount=default:traefik-sa
-          changed_when: false
-          failed_when: false
+    - name: Crear ClusterRoleBinding para traefik-sa si no existe
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl get clusterrolebinding traefik-sa-crb || kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-        - name: Crear token JWT del ServiceAccount traefik-sa
-          command: kubectl create token traefik-sa
-          register: traefik_jwt_token
+    - name: Crear token JWT del ServiceAccount traefik-sa
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl create token traefik-sa
+      register: sa_token_jwt
+      changed_when: false
 
-    - name: Guardar token JWT en los balanceadores
-      delegate_to: "{{ item }}"
-      become: true
+    - name: Guardar token JWT en balanceadores
       copy:
-        content: "{{ traefik_jwt_token.stdout }}"
+        content: "{{ sa_token_jwt.stdout }}"
         dest: "{{ traefik_token_path }}"
         mode: "0600"
-      loop: "{{ groups['load_balancers'] }}"
 
     - name: ⚙️ Generar traefik.toml
       template:
@@ -123,7 +119,7 @@
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
       vars:
-        traefik_token: "{{ traefik_jwt_token.stdout }}"
+        traefik_token: "{{ sa_token_jwt.stdout }}"
         vip: "{{ k8s_api_vip }}"
 
     - name: Generar archivo docker-compose.yml
