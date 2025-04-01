@@ -12,7 +12,7 @@
 
   tasks:
 
-    - name: 🔥 Eliminar Podman y herramientas relacionadas (si existen)
+    - name: 🔥 Eliminar Podman y herramientas relacionadas
       package:
         name:
           - podman
@@ -21,7 +21,7 @@
         state: absent
       ignore_errors: true
 
-    - name: 🧹 Eliminar carpetas de contenedores (si existen)
+    - name: 🧹 Eliminar carpetas de contenedores si existen
       file:
         path: "{{ item }}"
         state: absent
@@ -140,4 +140,4 @@
 
     - name: 📋 Mostrar estado del contenedor Traefik
       debug:
-        msg: "{{ traefik_status.stdout_lines }}
+        msg: "{{ traefik_status.stdout_lines }}"
