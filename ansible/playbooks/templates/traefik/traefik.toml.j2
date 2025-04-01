@@ -10,16 +10,22 @@
 [api]
   dashboard = true
 
+[log]
+  level = "DEBUG"
+
+[serversTransport]
+  rootCAs = ["/etc/traefik/certs/server-ca.crt"]
+  insecureSkipVerify = false
+
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
-  certificateAuthority = "/etc/traefik/certs/server-ca.crt"
+  serversTransport = "default"
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
-  certificateAuthority = "/etc/traefik/certs/server-ca.crt"
-
+  serversTransport = "default"
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
@@ -29,16 +35,11 @@
   directory = "/etc/traefik/dynamic_conf"
   watch = true
 
-[log]
-  level = "DEBUG"
-
-[serversTransport]
-  rootCAs = ["/etc/traefik/certs/server-ca.crt"]
-
 [certificatesResolvers.default]
   [certificatesResolvers.default.acme]
     email = "admin@cefaslocalserver.com"
     storage = "/etc/traefik/acme.json"
     caServer = "https://acme-v02.api.letsencrypt.org/directory"
+
     [certificatesResolvers.default.acme.httpChallenge]
       entryPoint = "web"
