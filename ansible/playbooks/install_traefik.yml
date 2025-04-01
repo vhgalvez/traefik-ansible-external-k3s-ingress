@@ -19,7 +19,7 @@
 
     - name: 📝 Guardar server-ca.crt en el balanceador
       copy:
-        content: "{{ server_ca_cert.stdout }}"
+        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
@@ -121,7 +121,6 @@
         mode: "0644"
       vars:
         vip: "{{ k8s_api_vip }}"
-
 
     - name: 🚀 Lanzar o reiniciar contenedor Traefik
       shell: |
