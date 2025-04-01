@@ -14,7 +14,7 @@ services:
       - "{{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro"
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
-      - "{{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro"
+      - "{{ traefik_token_path }}:/etc/traefik/token:ro" # Correction here!
       - "{{ traefik_config_dir }}/certs/server-ca.crt:/etc/traefik/server-ca.crt:ro"
     command:
       - --api.dashboard=true
