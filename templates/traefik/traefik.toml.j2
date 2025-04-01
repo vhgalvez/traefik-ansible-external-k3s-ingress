@@ -1,18 +1,14 @@
-# Configuración principal global
 [global]
   checkNewVersion = true
   sendAnonymousUsage = false
 
-# Nivel de log
 [log]
   level = "DEBUG"
 
-# API y dashboard
 [api]
   dashboard = true
   insecure = true
 
-# Entrypoints
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -28,7 +24,6 @@
   [entryPoints.traefik]
     address = ":8080"
 
-# Proveedores
 [providers]
 
   [providers.docker]
@@ -36,18 +31,22 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
+    endpoint = "{{ vip }}:6443"
     namespaces = ["default", "traefik"]
+    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    insecureSkipTLSVerify = true
 
   [providers.kubernetesCRD]
+    endpoint = "{{ vip }}:6443"
     namespaces = ["default", "traefik"]
+    token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    insecureSkipTLSVerify = true
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"
     watch = true
 
-# TLS
 [tls]
-
   [tls.stores]
     [tls.stores.default]
       [tls.stores.default.defaultCertificate]
@@ -65,6 +64,5 @@
         "TLS_AES_256_GCM_SHA384"
       ]
 
-# Health check
 [ping]
   entryPoint = "traefik"
