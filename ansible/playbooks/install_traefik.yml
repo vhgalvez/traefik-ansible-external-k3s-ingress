@@ -102,7 +102,7 @@
     - name: 📝 Guardar token si fue encontrado
       raw: |
         if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
-          echo "{{ sa_token.stdout }}" > {{ traefik_token_path }}
+          echo "{{ sa_token.stdout | trim }}" > {{ traefik_token_path }}
         fi
 
     - name: ⚙️ Generar traefik.toml
