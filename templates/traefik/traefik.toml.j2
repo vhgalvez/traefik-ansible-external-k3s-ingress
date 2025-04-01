@@ -31,16 +31,16 @@
     exposedByDefault = false
 
   [providers.kubernetesIngress]
-    endpoint = "{{ vip }}:6443"
-    namespaces = ["default", "traefik"]
+    endpoint = "https://{{ vip }}:6443"
     token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     insecureSkipTLSVerify = true
+    namespaces = ["default", "traefik"]
 
   [providers.kubernetesCRD]
-    endpoint = "{{ vip }}:6443"
-    namespaces = ["default", "traefik"]
+    endpoint = "https://{{ vip }}:6443"
     token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     insecureSkipTLSVerify = true
+    namespaces = ["default", "traefik"]
 
   [providers.file]
     directory = "/etc/traefik/dynamic_conf/"

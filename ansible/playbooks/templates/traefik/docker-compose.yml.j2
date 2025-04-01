@@ -11,15 +11,12 @@ services:
       - "8080:8080"
     env_file:
       - "{{ traefik_config_dir }}/.env"
-  
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "{{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro"
       - "{{ traefik_config_dir }}/dynamic_conf:/etc/traefik/dynamic_conf:ro"
       - "{{ traefik_config_dir }}/certs:/etc/traefik/certs:ro"
       - "{{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro"
-
-
     command:
       - --api.dashboard=true
       - --entrypoints.web.address=:80

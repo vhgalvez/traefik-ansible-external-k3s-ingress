@@ -7,8 +7,6 @@
   vars:
     traefik_dir: /etc/traefik
     traefik_config_dir: /etc/traefik
-    kubeconfig_src_path: /etc/rancher/k3s/k3s.yaml
-    kubeconfig_dst_path: "{{ traefik_dir }}/kubeconfig"
     traefik_token_path: "{{ traefik_dir }}/token"
     master1_ip: 10.17.4.21
     vip: 10.17.5.10
@@ -47,31 +45,20 @@
         - crt
         - key
 
-    - name: 📥 Obtener kubeconfig desde master1
-      delegate_to: "{{ master1_ip }}"
-      raw: "cat {{ kubeconfig_src_path }}"
-      register: kubeconfig_output
-
-    - name: 📝 Guardar kubeconfig localmente
-      copy:
-        content: "{{ kubeconfig_output.stdout | replace('https://127.0.0.1:6443', 'https://'+vip+':6443') }}"
-        dest: "{{ kubeconfig_dst_path }}"
-        mode: "0600"
-
     - name: 🛡️ Crear ServiceAccount para Traefik
       delegate_to: "{{ master1_ip }}"
       raw: |
-        kubectl --kubeconfig={{ kubeconfig_src_path }} -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
     - name: 🔐 Crear ClusterRoleBinding para Traefik
       delegate_to: "{{ master1_ip }}"
       raw: |
-        kubectl --kubeconfig={{ kubeconfig_src_path }} create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml create clusterrolebinding traefik-ingress-controller --clusterrole=cluster-admin --serviceaccount=kube-system:traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
     - name: 🔑 Obtener token del ServiceAccount
       delegate_to: "{{ master1_ip }}"
       raw: |
-        kubectl --kubeconfig={{ kubeconfig_src_path }} -n kube-system get secret $(kubectl --kubeconfig={{ kubeconfig_src_path }} -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}") -o jsonpath="{.data.token}" | base64 -d
+        kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system get secret $(kubectl --kubeconfig=/etc/rancher/k3s/k3s.yaml -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}") -o jsonpath="{.data.token}" | base64 -d
       register: sa_token
 
     - name: 💾 Guardar token en archivo
@@ -80,13 +67,13 @@
         dest: "{{ traefik_token_path }}"
         mode: "0600"
 
-    - name: 📦 Copiar archivo .env
+    - name: 📦 Copiar archivo .env con token y configuración
       template:
         src: templates/traefik/env.j2
         dest: "{{ traefik_dir }}/.env"
         mode: "0644"
 
-    - name: 🐳 Deploy Docker Compose (Traefik)
+    - name: 🐳 Generar docker-compose.yml para Traefik
       template:
         src: templates/traefik/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
