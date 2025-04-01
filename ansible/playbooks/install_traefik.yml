@@ -11,7 +11,6 @@
     master1_ip: "10.17.4.21"
 
   tasks:
-
     - name: 🔥 Eliminar Podman y herramientas relacionadas
       package:
         name:
@@ -76,35 +75,20 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding + Obtener token desde master1 (raw)
+    - name: 🔑 Obtener token de K3s desde master1
       delegate_to: "{{ master1_ip }}"
-      become: false
+      become: true
       run_once: true
-      block:
-
-        - name: 🛡️ Crear ServiceAccount traefik-ingress-controller
-          raw: |
-            kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
-
-        - name: 🔐 Crear ClusterRoleBinding traefik-ingress-controller
-          raw: |
-            kubectl create clusterrolebinding traefik-ingress-controller \
-              --clusterrole=cluster-admin \
-              --serviceaccount=kube-system:traefik-ingress-controller \
-              --dry-run=client -o yaml | kubectl apply -f -
-
-        - name: 🔑 Obtener token del ServiceAccount
-          raw: |
-            TOKEN_NAME=$(kubectl -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}")
-            kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath="{.data.token}" | base64 -d
-          register: sa_token
+      command: cat /etc/rancher/k3s/server/node-token
+      register: sa_token
+      changed_when: false
 
     - name: 📝 Guardar token en los nodos Traefik (con raw)
       raw: echo "{{ sa_token.stdout }}" > {{ traefik_token_path }}
 
     - name: ⚙️ Generar traefik.toml
       template:
-        src: "../../templates/traefik/traefik.toml.j2"
+        src: "ansible/playbooks/templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
       vars:
@@ -113,7 +97,7 @@
 
     - name: ⚙️ Generar archivo .env
       template:
-        src: "../../templates/traefik/env.j2"
+        src: "ansible/playbooks/templates/traefik/env.j2"
         dest: "{{ traefik_env_path }}"
         mode: "0644"
       vars:
@@ -123,7 +107,7 @@
 
     - name: 🐳 Generar archivo docker-compose.yml
       template:
-        src: "../../templates/traefik/docker-compose.yml.j2"
+        src: "ansible/playbooks/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
