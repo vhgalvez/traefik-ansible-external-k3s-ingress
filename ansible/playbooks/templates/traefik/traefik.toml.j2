@@ -13,10 +13,13 @@
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
+  certificateAuthority = "/etc/traefik/certs/server-ca.crt"
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
   token = "{{ traefik_token | trim }}"
+  certificateAuthority = "/etc/traefik/certs/server-ca.crt"
+
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
