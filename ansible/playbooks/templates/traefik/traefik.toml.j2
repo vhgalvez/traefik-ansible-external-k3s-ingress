@@ -11,11 +11,11 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  certAuthFilePath = "/etc/traefik/server-ca.crt" # tokenFile removed
+  token = "{{ traefik_token }}" # Usar el token aquí
 
 [providers.kubernetesCRD]
   endpoint = "https://{{ vip }}:6443"
-  certAuthFilePath = "/etc/traefik/server-ca.crt" # tokenFile removed
+  token = "{{ traefik_token }}" # Usar el token aquí
 
 [providers.docker]
   endpoint = "unix:///var/run/docker.sock"
