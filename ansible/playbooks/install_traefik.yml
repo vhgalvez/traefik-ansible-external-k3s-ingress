@@ -6,7 +6,6 @@
   vars:
     traefik_config_dir: "/etc/traefik"
     traefik_token_path: "/etc/traefik/token"
-    traefik_env_path: "/etc/traefik/.env"
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
 
@@ -76,15 +75,23 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🔑 Obtener token de K3s desde master1
+    - name: 🔑 Intentar obtener token de K3s si existe
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      raw: "cat /etc/rancher/k3s/server/node-token"
+      raw: |
+        if [ -f /var/lib/rancher/k3s/server/token ]; then
+          cat /var/lib/rancher/k3s/server/token
+        else
+          echo "TOKEN_NOT_FOUND"
+        fi
       register: sa_token
       changed_when: false
 
-    - name: 📝 Guardar token en los nodos Traefik (con raw)
-      raw: echo "{{ sa_token.stdout }}" > {{ traefik_token_path }}
+    - name: 📝 Guardar token si fue encontrado
+      raw: |
+        if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
+          echo "{{ sa_token.stdout }}" > {{ traefik_token_path }}
+        fi
 
     - name: ⚙️ Generar traefik.toml
       template:
@@ -95,16 +102,6 @@
         traefik_token: "{{ sa_token.stdout }}"
         vip: "{{ k8s_api_vip }}"
 
-    - name: ⚙️ Generar archivo .env
-      template:
-        src: "{{ playbook_dir }}/templates/traefik/env.j2"
-        dest: "{{ traefik_env_path }}"
-        mode: "0644"
-      vars:
-        vip: "{{ k8s_api_vip }}"
-        traefik_dir: "{{ traefik_config_dir }}"
-        traefik_token_path: "{{ traefik_token_path }}"
-
     - name: 🐳 Generar archivo docker-compose.yml
       template:
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
@@ -113,8 +110,8 @@
 
     - name: 🚀 Lanzar o reiniciar contenedor Traefik
       shell: |
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml --env-file {{ traefik_env_path }} down || true
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml --env-file {{ traefik_env_path }} up -d
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
 
