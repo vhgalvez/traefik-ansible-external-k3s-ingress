@@ -11,12 +11,6 @@
     master1_ip: "10.17.4.21"
 
   tasks:
-    - name: 🐍 Instalar Python 3 y pip en AlmaLinux
-      package:
-        name:
-          - python3
-          - python3-pip
-        state: present
 
     - name: 🔥 Eliminar Podman y herramientas relacionadas
       package:
@@ -82,50 +76,31 @@
         content: "{}"
         mode: "0600"
 
-    - name: 📥 Copiar kubeconfig temporal desde master1 a localhost
-      become: false
-      run_once: true
+    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding + Obtener token desde master1 (raw)
       delegate_to: "{{ master1_ip }}"
-      fetch:
-        src: /etc/rancher/k3s/k3s.yaml
-        dest: /tmp/kubeconfig-traefik
-        flat: true
-
-    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding + Obtener token
-      delegate_to: localhost
       become: false
       run_once: true
       block:
-        - name: 🛡️ Crear ServiceAccount para Traefik
-          shell: |
-            KUBECONFIG=/tmp/kubeconfig-traefik kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
 
-        - name: 🔐 Crear ClusterRoleBinding para Traefik
-          shell: |
-            KUBECONFIG=/tmp/kubeconfig-traefik kubectl create clusterrolebinding traefik-ingress-controller \
+        - name: 🛡️ Crear ServiceAccount traefik-ingress-controller
+          raw: |
+            kubectl -n kube-system create serviceaccount traefik-ingress-controller --dry-run=client -o yaml | kubectl apply -f -
+
+        - name: 🔐 Crear ClusterRoleBinding traefik-ingress-controller
+          raw: |
+            kubectl create clusterrolebinding traefik-ingress-controller \
               --clusterrole=cluster-admin \
               --serviceaccount=kube-system:traefik-ingress-controller \
               --dry-run=client -o yaml | kubectl apply -f -
 
         - name: 🔑 Obtener token del ServiceAccount
-          shell: |
-            TOKEN_NAME=$(KUBECONFIG=/tmp/kubeconfig-traefik kubectl -n kube-system get sa traefik-ingress-controller -o jsonpath='{.secrets[0].name}')
-            KUBECONFIG=/tmp/kubeconfig-traefik kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath='{.data.token}' | base64 -d
+          raw: |
+            TOKEN_NAME=$(kubectl -n kube-system get sa traefik-ingress-controller -o jsonpath="{.secrets[0].name}")
+            kubectl -n kube-system get secret $TOKEN_NAME -o jsonpath="{.data.token}" | base64 -d
           register: sa_token
 
-    - name: 🧽 Eliminar kubeconfig temporal
-      delegate_to: localhost
-      become: false
-      run_once: true
-      file:
-        path: /tmp/kubeconfig-traefik
-        state: absent
-
-    - name: 📂 Guardar token en archivo en los nodos Traefik
-      copy:
-        content: "{{ sa_token.stdout }}"
-        dest: "{{ traefik_token_path }}"
-        mode: "0600"
+    - name: 📝 Guardar token en los nodos Traefik (con raw)
+      raw: echo "{{ sa_token.stdout }}" > {{ traefik_token_path }}
 
     - name: ⚙️ Generar traefik.toml
       template:
