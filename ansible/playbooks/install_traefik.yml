@@ -10,6 +10,18 @@
     master1_ip: "10.17.4.21"
 
   tasks:
+    - name: 📄 Copiar certificado CA del API server desde master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
+      register: server_ca_cert
+      changed_when: false
+
+    - name: 📝 Guardar server-ca.crt en el balanceador
+      copy:
+        content: "{{ server_ca_cert.stdout }}"
+        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
+        mode: "0644"
 
     - name: 🔥 Eliminar Podman y herramientas relacionadas
       package:
