@@ -19,7 +19,31 @@
           - python3-pip
         state: present
 
-    - name: 🐳 Instalar Docker en AlmaLinux si no está presente
+    - name: 🔥 Eliminar podman y herramientas relacionadas si existen
+      block:
+        - name: 🛑 Detener contenedores Podman si existen
+          ansible.builtin.shell: |
+            podman ps -q | xargs -r podman stop
+          ignore_errors: true
+
+        - name: ❌ Desinstalar podman y buildah
+          package:
+            name:
+              - podman
+              - buildah
+            state: absent
+          ignore_errors: true
+
+        - name: 🧹 Eliminar datos residuales de podman
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /var/lib/containers
+            - /etc/containers
+          ignore_errors: true
+
+    - name: 🐳 Instalar Docker en AlmaLinux
       block:
         - name: 🔍 Verificar si Docker ya está instalado
           command: which docker
@@ -41,7 +65,7 @@
                   - docker-ce
                   - docker-ce-cli
                   - containerd.io
-                state: absent
+              state: absent
               ignore_errors: true
 
             - name: 🧹 Eliminar directorios relacionados
@@ -81,7 +105,7 @@
             state: started
             enabled: true
 
-    - name: 📦 Instalar versiones compatibles de Docker SDK y docker-compose
+    - name: 📦 Instalar Docker SDK y docker-compose con pip
       pip:
         name:
           - docker==5.0.3
@@ -152,7 +176,7 @@
       when: not docker_sock.stat.exists
 
     - name: 🚀 Lanzar contenedor Traefik con docker compose CLI
-      ansible.builtin.shell: |
+      shell: |
         docker compose -f {{ traefik_dir }}/docker-compose.yml --env-file {{ traefik_dir }}/.env up -d
       args:
         executable: /bin/bash
