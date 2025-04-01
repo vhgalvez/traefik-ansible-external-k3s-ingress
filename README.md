@@ -94,11 +94,11 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 ```plaintext
 10.17.3.12 whoami.localhost
 ```
-
 ---
 
+## Traefik dashboard
 
-
+![Traefik dashboard](docs/Traefik_dashboard.png)
 
 
 ### Playbook de Ansible traefik instalacion OK
