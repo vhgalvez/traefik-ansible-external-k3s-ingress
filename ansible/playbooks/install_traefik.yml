@@ -1,4 +1,3 @@
----
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -17,11 +16,31 @@
       register: server_ca_cert
       changed_when: false
 
+    - name: Crear directorios para Traefik
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/certs"
+        - "{{ traefik_config_dir }}/dynamic_conf"
+
     - name: Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
+
+    - name: Asegurar que el certificado raíz existe
+      ansible.builtin.stat:
+        path: "{{ traefik_config_dir }}/certs/server-ca.crt"
+      register: cert_check
+
+    - name: Fallar si el certificado raíz no existe
+      ansible.builtin.fail:
+        msg: "El archivo server-ca.crt no se encuentra en {{ traefik_config_dir }}/certs"
+      when: not cert_check.stat.exists
 
     - name: Eliminar Podman y herramientas relacionadas
       package:
@@ -55,16 +74,6 @@
         name: docker
         enabled: true
         state: started
-
-    - name: Crear directorios para Traefik
-      file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ traefik_config_dir }}"
-        - "{{ traefik_config_dir }}/certs"
-        - "{{ traefik_config_dir }}/dynamic_conf"
 
     - name: Copiar certificados TLS
       copy:
