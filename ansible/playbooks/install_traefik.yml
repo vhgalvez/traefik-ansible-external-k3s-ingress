@@ -17,10 +17,10 @@
       register: server_ca_cert
       changed_when: false
 
-    - name: 📝 Guardar server-ca.crt en el balanceador
+    - name: 📝 Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
-        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
+        dest: "/etc/ssl/certs/k3s-server-ca.crt"
         mode: "0644"
 
     - name: 🔥 Eliminar Podman y herramientas relacionadas
