@@ -134,9 +134,9 @@
       register: sa_token_jwt
       changed_when: false
 
-    - name: Guardar token JWT en balanceadores
+    - name: Guardar token JWT en balanceadores (limpio)
       copy:
-        content: "{{ sa_token_jwt.stdout }}"
+        content: "{{ sa_token_jwt.stdout | trim }}"
         dest: "{{ traefik_token_path }}"
         mode: "0600"
 
