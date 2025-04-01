@@ -5,15 +5,18 @@
   [entryPoints.websecure]
     address = ":443"
 
+  [entryPoints.traefik]
+    address = ":8080"
+
 [api]
   dashboard = true
-  insecure = false
+  insecure = true  # ⚠️ Cambia a false si luego vas a protegerlo
 
 [log]
   level = "DEBUG"
 
 [providers.kubernetesIngress]
-  endpoint = "https://10.17.5.10:6443"
+  endpoint = "https://{{ vip }}:6443"
   token = "/etc/traefik/token"
   certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
   namespaces = ["default"]
