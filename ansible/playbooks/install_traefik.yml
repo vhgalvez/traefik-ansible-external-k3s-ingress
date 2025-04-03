@@ -60,14 +60,25 @@
         - /etc/containers
       ignore_errors: true
 
+    - name: Instalar dnf-plugins-core
+      ansible.builtin.package:
+        name: dnf-plugins-core
+        state: present
+
+    - name: Añadir repositorio oficial de Docker
+      ansible.builtin.command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
     - name: Instalar Docker CE y plugin docker compose
-      package:
+      ansible.builtin.package:
         name:
           - docker-ce
           - docker-ce-cli
           - containerd.io
           - docker-compose-plugin
         state: present
+
 
     - name: ▶️ Habilitar y arrancar Docker
       systemd:
