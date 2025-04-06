@@ -1,11 +1,10 @@
----
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
 
   vars:
     traefik_config_dir: "/etc/traefik"
-    traefik_token_path: "/srv/nfs/traefik-token/traefik.jwt"  # <- ruta persistente recomendada (NFS)
+    traefik_token_path: "/etc/traefik/token"
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
 
@@ -26,12 +25,6 @@
         - "{{ traefik_config_dir }}"
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
-
-    - name: Crear directorio persistente para el token JWT
-      file:
-        path: "/srv/nfs/traefik-token"
-        state: directory
-        mode: "0777"
 
     - name: Guardar server-ca.crt en los balanceadores
       copy:
@@ -85,6 +78,7 @@
           - containerd.io
           - docker-compose-plugin
         state: present
+
 
     - name: ▶️ Habilitar y arrancar Docker
       systemd:
@@ -151,7 +145,7 @@
       register: sa_token_jwt
       changed_when: false
 
-    - name: Guardar token JWT en ruta persistente
+    - name: Guardar token JWT en balanceadores (limpio)
       copy:
         content: "{{ sa_token_jwt.stdout | trim }}"
         dest: "{{ traefik_token_path }}"
