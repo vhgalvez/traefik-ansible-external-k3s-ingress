@@ -50,13 +50,14 @@
             exportfs -rav
             systemctl restart nfs-server
 
-    - name: Montar NFS con token traefik.jwt desde storage1
-      mount:
-        path: "/mnt/traefik-token"
-        src: "10.17.4.27:/srv/nfs/traefik-token"
-        fstype: nfs
-        opts: rw,sync,hard,intr
-        state: mounted
+    - name: Montar NFS con token traefik.jwt desde storage1 (con manejo de error)
+      shell: |
+        mkdir -p /mnt/traefik-token
+        mountpoint -q /mnt/traefik-token || mount -t nfs 10.17.4.27:/srv/nfs/traefik-token /mnt/traefik-token
+      args:
+        executable: /bin/bash
+      register: mount_result
+      failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
     - name: Guardar server-ca.crt en los balanceadores
       copy:
