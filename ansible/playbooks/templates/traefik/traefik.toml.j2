@@ -10,14 +10,14 @@
 
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Cambiar a false cuando configures autenticación
+  insecure = true  # ⚠️ Cambia a false cuando configures autenticación
 
 [log]
   level = "DEBUG"
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  token = "/etc/traefik/token/traefik.jwt"
   certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
   namespaces = ["default"]
 
