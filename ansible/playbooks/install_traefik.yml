@@ -39,90 +39,10 @@
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name: Asegurar que el certificado raíz existe
+    - name: Verificar si ya existe token JWT persistente
       stat:
-        path: "{{ traefik_config_dir }}/certs/server-ca.crt"
-      register: cert_check
-
-    - name: Fallar si el certificado raíz no existe
-      fail:
-        msg: "El archivo server-ca.crt no se encuentra en {{ traefik_config_dir }}/certs"
-      when: not cert_check.stat.exists
-
-    - name: Eliminar Podman y herramientas relacionadas
-      package:
-        name:
-          - podman
-          - podman-docker
-          - buildah
-        state: absent
-      ignore_errors: true
-
-    - name: Eliminar carpetas de contenedores si existen
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /var/lib/containers
-        - /etc/containers
-      ignore_errors: true
-
-    - name: Instalar dnf-plugins-core
-      package:
-        name: dnf-plugins-core
-        state: present
-
-    - name: Añadir repositorio oficial de Docker
-      command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-      args:
-        creates: /etc/yum.repos.d/docker-ce.repo
-
-    - name: Instalar Docker CE y plugin docker compose
-      package:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-compose-plugin
-        state: present
-
-    - name: Habilitar y arrancar Docker
-      systemd:
-        name: docker
-        enabled: true
-        state: started
-
-    - name: Copiar certificados TLS
-      copy:
-        src: "files/certs/traefik.local.{{ item }}"
-        dest: "{{ traefik_config_dir }}/certs/traefik.local.{{ item }}"
-        mode: "0644"
-      loop:
-        - crt
-        - key
-
-    - name: Eliminar traefik.toml si es un directorio por error
-      file:
-        path: "{{ traefik_config_dir }}/traefik.toml"
-        state: absent
-        force: true
-
-    - name: Crear archivo acme.json
-      copy:
-        dest: "{{ traefik_config_dir }}/acme.json"
-        content: "{}"
-        mode: "0600"
-
-    - name: Esperar que el API Server esté listo
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: kubectl get --raw /healthz
-      register: k8s_api_health
-      until: k8s_api_health.stdout == "ok"
-      retries: 10
-      delay: 5
-      changed_when: false
-      ignore_errors: true
+        path: "{{ traefik_token_path }}"
+      register: token_check
 
     - name: Eliminar ServiceAccount y ClusterRoleBinding previos si existen
       delegate_to: "{{ master1_ip }}"
@@ -130,11 +50,13 @@
       raw: |
         kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
         kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
+      when: not token_check.stat.exists
 
     - name: Crear ServiceAccount para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl create sa traefik-sa --namespace default || true
+      when: not token_check.stat.exists
 
     - name: Crear ClusterRoleBinding para traefik-sa si no existe
       delegate_to: "{{ master1_ip }}"
@@ -143,6 +65,7 @@
         kubectl get clusterrolebinding traefik-sa-crb || \
         kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
       changed_when: false
+      when: not token_check.stat.exists
 
     - name: Obtener token moderno (JWT) del ServiceAccount traefik-sa
       delegate_to: "{{ master1_ip }}"
@@ -150,12 +73,14 @@
       raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
+      when: not token_check.stat.exists
 
     - name: Guardar token JWT en ruta persistente (Longhorn)
       copy:
-        content: "{{ sa_token_jwt.stdout | trim }}"
+        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
         dest: "{{ traefik_token_path }}"
         mode: "0600"
+      when: not token_check.stat.exists
 
     - name: Generar traefik.toml
       template:
@@ -189,9 +114,10 @@
         msg: "{{ traefik_status.stdout_lines }}"
 
     - name: Copiar token JWT al nodo storage1 como respaldo
-      delegate_to: storage1.cefaslocalserver.com
+      delegate_to: 10.17.4.27
       become: true
       copy:
-        content: "{{ sa_token_jwt.stdout | trim }}"
+        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
         dest: "/mnt/longhorn-disk/tokens/traefik.jwt"
         mode: "0600"
+      when: not token_check.stat.exists
