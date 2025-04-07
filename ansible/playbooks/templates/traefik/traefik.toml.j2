@@ -10,7 +10,7 @@
 
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Cambia a false si luego vas a protegerlo
+  insecure = true  # ⚠️ Cambiar a false si luego vas a protegerlo
 
 [log]
   level = "DEBUG"
@@ -22,7 +22,7 @@
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]
-  email = "admin@example.com"
+  email = "{{ letsencrypt_email | default('admin@example.com') }}"
   storage = "/acme.json"
   [certificatesResolvers.default.acme.httpChallenge]
     entryPoint = "web"

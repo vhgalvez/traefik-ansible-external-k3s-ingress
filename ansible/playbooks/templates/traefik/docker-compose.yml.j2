@@ -8,11 +8,11 @@ services:
     ports:
       - "80:80"         # HTTP
       - "443:443"       # HTTPS
-      - "8080:8080"     # Traefik Dashboard
+      - "8080:8080"     # Traefik Dashboard (⚠️ cambiar seguridad más adelante)
     volumes:
-      - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
-      - /etc/traefik/acme.json:/acme.json
-      - /etc/traefik/certs:/etc/traefik/certs:ro
-      - /mnt/longhorn-disk/tokens/traefik.jwt:/var/run/secrets/kubernetes.io/serviceaccount/token:ro
+      - {{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro
+      - {{ traefik_config_dir }}/acme.json:/acme.json
+      - {{ traefik_config_dir }}/certs:/etc/traefik/certs:ro
+      - {{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro
     environment:
       - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
