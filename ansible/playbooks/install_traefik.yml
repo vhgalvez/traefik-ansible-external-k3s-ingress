@@ -34,24 +34,19 @@
         state: directory
         mode: "0755"
 
-    - name: Crear carpeta en storage1 para respaldo de token JWT y configurar /etc/exports
+    - name: Crear carpeta y exportación NFS en storage1 con raw
       delegate_to: 10.17.4.27
       become: true
       block:
-        - name: Crear carpeta /srv/nfs/traefik-token si no existe
-          file:
-            path: "/srv/nfs/traefik-token"
-            state: directory
-            mode: "0755"
+        - name: Crear carpeta /srv/nfs/traefik-token con raw
+          raw: mkdir -p /srv/nfs/traefik-token && chmod 0755 /srv/nfs/traefik-token
 
-        - name: Asegurar configuración en /etc/exports
-          lineinfile:
-            path: /etc/exports
-            line: "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check)"
-            create: yes
+        - name: Asegurar entrada en /etc/exports
+          raw: |
+            grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check)" >> /etc/exports
 
         - name: Aplicar exportfs y reiniciar nfs-server
-          shell: |
+          raw: |
             exportfs -rav
             systemctl restart nfs-server
 
@@ -115,10 +110,7 @@
     - name: Guardar copia del token JWT en NFS en nodo storage1
       delegate_to: 10.17.4.27
       become: true
-      copy:
-        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
-        dest: "{{ nfs_backup_token_path }}"
-        mode: "0600"
+      raw: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
       when: not token_check.stat.exists
 
     - name: Generar traefik.toml
