@@ -1,4 +1,3 @@
-# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -6,7 +5,7 @@
 
   vars:
     traefik_config_dir: "/etc/traefik"
-    traefik_token_path: "/mnt/longhorn-disk/tokens/traefik.jwt"  # Ruta persistente en disco Longhorn
+    traefik_token_path: "/mnt/longhorn-disk/tokens/traefik.jwt"
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
 
@@ -69,17 +68,17 @@
       ignore_errors: true
 
     - name: Instalar dnf-plugins-core
-      ansible.builtin.package:
+      package:
         name: dnf-plugins-core
         state: present
 
     - name: Añadir repositorio oficial de Docker
-      ansible.builtin.command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
       args:
         creates: /etc/yum.repos.d/docker-ce.repo
 
     - name: Instalar Docker CE y plugin docker compose
-      ansible.builtin.package:
+      package:
         name:
           - docker-ce
           - docker-ce-cli
@@ -87,7 +86,7 @@
           - docker-compose-plugin
         state: present
 
-    - name: ▶️ Habilitar y arrancar Docker
+    - name: Habilitar y arrancar Docker
       systemd:
         name: docker
         enabled: true
@@ -158,13 +157,12 @@
         dest: "{{ traefik_token_path }}"
         mode: "0600"
 
-    - name: ⚙️ Generar traefik.toml
+    - name: Generar traefik.toml
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
       vars:
-        traefik_token: "{{ sa_token_jwt.stdout }}"
         vip: "{{ k8s_api_vip }}"
 
     - name: Generar archivo docker-compose.yml
@@ -182,10 +180,18 @@
       args:
         executable: /bin/bash
 
-    - name: ✅ Verificar estado del contenedor Traefik
+    - name: Verificar estado del contenedor Traefik
       shell: docker ps -a | grep traefik || true
       register: traefik_status
 
     - name: Mostrar estado del contenedor Traefik
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
+
+    - name: Copiar token JWT al nodo storage1 como respaldo
+      delegate_to: storage1.cefaslocalserver.com
+      become: true
+      copy:
+        content: "{{ sa_token_jwt.stdout | trim }}"
+        dest: "/mnt/longhorn-disk/tokens/traefik.jwt"
+        mode: "0600"
