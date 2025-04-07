@@ -34,6 +34,27 @@
         state: directory
         mode: "0755"
 
+    - name: Crear carpeta en storage1 para respaldo de token JWT y configurar /etc/exports
+      delegate_to: 10.17.4.27
+      become: true
+      block:
+        - name: Crear carpeta /srv/nfs/traefik-token si no existe
+          file:
+            path: "/srv/nfs/traefik-token"
+            state: directory
+            mode: "0755"
+
+        - name: Asegurar configuración en /etc/exports
+          lineinfile:
+            path: /etc/exports
+            line: "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check)"
+            create: yes
+
+        - name: Aplicar exportfs y reiniciar nfs-server
+          shell: |
+            exportfs -rav
+            systemctl restart nfs-server
+
     - name: Montar NFS con token traefik.jwt desde storage1
       mount:
         path: "/mnt/traefik-token"
@@ -89,15 +110,6 @@
         content: "{{ sa_token_jwt.stdout | default('') | trim }}"
         dest: "{{ traefik_token_path }}"
         mode: "0600"
-      when: not token_check.stat.exists
-
-    - name: Crear carpeta en storage1 para respaldo de token JWT
-      delegate_to: 10.17.4.27
-      become: true
-      file:
-        path: "/srv/nfs/traefik-token"
-        state: directory
-        mode: "0755"
       when: not token_check.stat.exists
 
     - name: Guardar copia del token JWT en NFS en nodo storage1
