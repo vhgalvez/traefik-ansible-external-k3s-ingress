@@ -17,7 +17,7 @@
 
 [providers.kubernetesIngress]
   endpoint = "https://{{ vip }}:6443"
-  token = "/etc/traefik/token/traefik.jwt"
+  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
   certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
   namespaces = ["default"]
 
