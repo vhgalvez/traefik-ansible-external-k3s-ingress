@@ -159,11 +159,13 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 
 ## Licencia
 
-Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
+## 📜 Licencia este proyecto está licenciado bajo la **Licencia MIT** [LICENSE](LICENSE).
 
 ## Autor
 
 Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
 
 
-https://github.com/vhgalvez/FlatcarMicroCloud
+
+> Proyecto independiente para usarse como prerequisito en arquitecturas como [FlatcarMicroCloud](https://github.com/vhgalvez/FlatcarMicroCloud)
+
