@@ -89,6 +89,13 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 ```
 ---
 
+## Traefik jwt token
+
+[Traefik jwt token](https://github.com/vhgalvez/traefik-k8s-ingress-controller-ansible/blob/main/docs/traefik_jwt.md)
+
+
+---
+
 ## Traefik dashboard
 
 ![Traefik dashboard](docs/Traefik_dashboard.png)
