@@ -36,7 +36,7 @@ exportfs -rav && systemctl restart nfs-server
 
 ---
 
-## 🚧 Nodo load_balancer - Montaje del token
+## ⚠️ Nodo load_balancer - Montaje del token
 
 1. Se crea el directorio de montaje:
 ```bash
@@ -116,7 +116,7 @@ echo "$TOKEN" > /srv/nfs/traefik-token/traefik.jwt
 Todo el proceso anterior está automatizado en el playbook:
 
 ```
-playbooks/install_traefik.yml
+ansible/playbooks/install_traefik.yml
 ```
 
 Incluye:
@@ -128,23 +128,22 @@ Incluye:
 - Creación de kubeconfig personalizado para Traefik
 - Despliegue con docker-compose
 
+Listo para integrarse con el clúster Flatcar + K3s.
+
 ---
 
 ## 📂 Resultado final
-
-| Nodo         | Carpeta creada                | ¿Exportada vía NFS? | ¿Token se guarda aquí? |
-|--------------|-------------------------------|-----------------------|--------------------------|
-| `storage1`   | `/srv/nfs/traefik-token`      | ✅ Sí               | ✅ Sí                  |
-| `load_balancer` | `/mnt/traefik-token` (NFS) | ➖ Montaje NFS       | ✅ Sí (vía copia)      |
-
----
+| Nodo          | Carpeta creada                | ¿Exportada vía NFS? | ¿Token se guarda aquí? |
+|---------------|-------------------------------|-------------------------|----------------------------|
+| storage1      | /srv/nfs/traefik-token        | ✅ Sí               | ✅ Sí                  |
+| load_balancer | /mnt/traefik-token (montado) | ➖ Montaje NFS       | ✅ Sí (vía copia)     |
 
 ## 📘️ Conclusión
 
 Este playbook está correctamente preparado para:
 
-- Crear la carpeta del token en storage1.
-- Configurarla como exportación NFS.
-- Montarla automáticamente en cada balanceador de carga.
-- Generar y guardar el `traefik.jwt` desde master1.
-- Dejarlo disponible tanto en `storage1` como en los balanceadores de carga.
+- Crear la carpeta del token en storage1
+- Configurarla como exportación NFS
+- Montarla automáticamente en cada balanceador de carga
+- Generar y guardar el `traefik.jwt` desde master1
+- Dejarlo disponible tanto en storage1 como en los balanceadores de carga
