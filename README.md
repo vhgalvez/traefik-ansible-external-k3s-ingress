@@ -166,6 +166,5 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
 
 
-
 > Proyecto independiente para usarse como prerequisito en arquitecturas como [FlatcarMicroCloud](https://github.com/vhgalvez/FlatcarMicroCloud)
 
