@@ -1,5 +1,3 @@
-
-# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -35,25 +33,25 @@
       file:
         path: "/mnt/traefik-token"
         state: directory
-        mode: "0755"
+        mode: "0777"
 
-    - name: Crear carpeta y exportación NFS en storage1 con raw
+    - name: Crear carpeta y exportación NFS en storage1 con permisos
       delegate_to: 10.17.4.27
       become: true
       block:
-        - name: Crear carpeta /srv/nfs/traefik-token con raw
-          raw: mkdir -p /srv/nfs/traefik-token && chmod 0755 /srv/nfs/traefik-token
+        - name: Crear carpeta /srv/nfs/traefik-token con permisos
+          raw: mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
 
         - name: Asegurar entrada en /etc/exports
           raw: |
-            grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check)" >> /etc/exports
+            grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
 
         - name: Aplicar exportfs y reiniciar nfs-server
           raw: |
             exportfs -rav
             systemctl restart nfs-server
 
-    - name: Montar NFS con token traefik.jwt desde storage1 (con manejo de error)
+    - name: Montar NFS con token traefik.jwt desde storage1
       shell: |
         mkdir -p /mnt/traefik-token
         mountpoint -q /mnt/traefik-token || mount -t nfs 10.17.4.27:/srv/nfs/traefik-token /mnt/traefik-token
@@ -93,18 +91,16 @@
       changed_when: false
 
     - name: Guardar token JWT en ruta montada persistente
-      copy:
-        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
-        dest: "{{ traefik_token_path }}"
-        mode: "0600"
-        force: true
+      shell: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ traefik_token_path }} && chmod 0600 {{ traefik_token_path }}
+      args:
+        executable: /bin/bash
 
     - name: Guardar copia del token JWT en nodo storage1
       delegate_to: 10.17.4.27
       become: true
       raw: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
 
-    - name: Generar kubeconfig para Traefik desde master1 (usando raw)
+    - name: Generar kubeconfig para Traefik desde master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
