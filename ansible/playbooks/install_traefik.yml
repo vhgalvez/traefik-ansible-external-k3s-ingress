@@ -1,3 +1,4 @@
+# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -28,7 +29,7 @@
       raw: mkdir -p /mnt/traefik-token
       changed_when: false
 
-    - name: 🗙️ Eliminar Podman y herramientas relacionadas
+    - name: ❌ Eliminar Podman y herramientas relacionadas
       raw: |
         dnf remove -y podman podman-docker buildah || true
         rm -rf /var/lib/containers /etc/containers || true
@@ -62,13 +63,13 @@
       register: mount_result
       failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
-    - name: 🗕️ Guardar server-ca.crt en los balanceadores
+    - name: 🕟 Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name: 🗙️ Eliminar ServiceAccount y ClusterRoleBinding previos
+    - name: ❌ Eliminar ServiceAccount y ClusterRoleBinding previos
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
@@ -85,21 +86,25 @@
       run_once: true
       raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: 📿 Generar token JWT para traefik-sa
+    - name: 📟 Generar token JWT para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
-    - name: 📀 Guardar token JWT en /mnt/traefik-token
-      shell: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ traefik_token_path }} && chmod 0600 {{ traefik_token_path }}
-      args:
-        executable: /bin/bash
+    - name: 💾 Guardar token JWT en /mnt/traefik-token
+      copy:
+        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
+        dest: "{{ traefik_token_path }}"
+        mode: "0600"
 
-    - name: 📀 Guardar copia del token JWT en storage1
+    - name: 💾 Guardar copia del token JWT en storage1
       delegate_to: "{{ storage_ip }}"
-      raw: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
+      copy:
+        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
+        dest: "{{ nfs_backup_token_path }}"
+        mode: "0600"
 
     - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
@@ -139,7 +144,7 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
-    - name: 🔄 Reiniciar contenedor Traefik con nuevo token
+    - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
