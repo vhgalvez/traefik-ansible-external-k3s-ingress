@@ -1,3 +1,4 @@
+# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -147,14 +148,6 @@
         path: "{{ traefik_config_dir }}/acme.json"
         state: touch
         mode: "0600"
-
-    - name: ↺ Reiniciar contenedor Traefik con nuevo token
-      shell: |
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
-        docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
-      args:
-        executable: /bin/bash
-
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
