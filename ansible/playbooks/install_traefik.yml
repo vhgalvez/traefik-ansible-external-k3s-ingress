@@ -143,10 +143,16 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
-    - name: 📄 Asegurar que el archivo acme.json existe con los permisos correctos
+    - name: Eliminar acme.json si es un directorio por error
       file:
         path: "{{ traefik_config_dir }}/acme.json"
-        state: touch
+        state: absent
+        force: true
+
+    - name: Crear archivo acme.json correctamente
+      copy:
+        dest: "{{ traefik_config_dir }}/acme.json"
+        content: "{}"
         mode: "0600"
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo token
