@@ -142,6 +142,21 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
+    - name: 📄 Crear archivo acme.json con permisos seguros
+      shell: |
+        touch {{ traefik_config_dir }}/acme.json
+        chmod 600 {{ traefik_config_dir }}/acme.json
+      args:
+        executable: /bin/bash
+
+    - name: ↺ Reiniciar contenedor Traefik con nuevo token
+      shell: |
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
+      args:
+        executable: /bin/bash
+
+
     - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
