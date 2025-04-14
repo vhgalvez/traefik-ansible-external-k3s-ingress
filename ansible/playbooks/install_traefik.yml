@@ -28,6 +28,49 @@
       raw: mkdir -p /mnt/traefik-token
       changed_when: false
 
+    - name: 🧹 Eliminar Podman y herramientas relacionadas
+      package:
+        name:
+          - podman
+          - podman-docker
+          - buildah
+        state: absent
+      ignore_errors: true
+
+    - name: 🧹 Eliminar carpetas de contenedores si existen
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/containers
+        - /etc/containers
+      ignore_errors: true
+
+    - name: 🧰 Instalar dnf-plugins-core
+      package:
+        name: dnf-plugins-core
+        state: present
+
+    - name: ➕ Añadir repositorio oficial de Docker
+      command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+    - name: 🐳 Instalar Docker CE y Docker Compose Plugin
+      package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: ▶️ Habilitar y arrancar Docker
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
     - name: 🔴 Crear carpeta y exportación NFS en storage1
       delegate_to: "{{ storage_ip }}"
       become: true
