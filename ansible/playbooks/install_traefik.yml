@@ -99,13 +99,11 @@
       args:
         executable: /bin/bash
 
-    - name: 📀 Guardar copia del token JWT limpio en storage1
+    - name: 📀 Guardar copia del token JWT limpio en storage1 (modo raw, sin Python)
       delegate_to: "{{ storage_ip }}"
-      shell: |
-        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }}
-        chmod 0600 {{ nfs_backup_token_path }}
-      args:
-        executable: /bin/bash
+      raw: |
+        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
+      changed_when: true
 
     - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
