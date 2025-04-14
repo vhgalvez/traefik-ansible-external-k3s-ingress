@@ -142,12 +142,11 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
-    - name: 📄 Crear archivo acme.json con permisos seguros
-      shell: |
-        touch {{ traefik_config_dir }}/acme.json
-        chmod 600 {{ traefik_config_dir }}/acme.json
-      args:
-        executable: /bin/bash
+    - name: 📄 Asegurar que el archivo acme.json existe con los permisos correctos
+      file:
+        path: "{{ traefik_config_dir }}/acme.json"
+        state: touch
+        mode: "0600"
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
