@@ -28,64 +28,30 @@
       raw: mkdir -p /mnt/traefik-token
       changed_when: false
 
-    - name: 🧹 Eliminar Podman y herramientas relacionadas
-      package:
-        name:
-          - podman
-          - podman-docker
-          - buildah
-        state: absent
-      ignore_errors: true
+    - name: 🗙️ Eliminar Podman y herramientas relacionadas
+      raw: |
+        dnf remove -y podman podman-docker buildah || true
+        rm -rf /var/lib/containers /etc/containers || true
 
-    - name: 🧹 Eliminar carpetas de contenedores si existen
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /var/lib/containers
-        - /etc/containers
-      ignore_errors: true
-
-    - name: 🧰 Instalar dnf-plugins-core
-      package:
-        name: dnf-plugins-core
-        state: present
+    - name: 🛠️ Instalar dnf-plugins-core
+      raw: dnf install -y dnf-plugins-core
 
     - name: ➕ Añadir repositorio oficial de Docker
-      command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-      args:
-        creates: /etc/yum.repos.d/docker-ce.repo
+      raw: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 
     - name: 🐳 Instalar Docker CE y Docker Compose Plugin
-      package:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-compose-plugin
-        state: present
+      raw: dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
     - name: ▶️ Habilitar y arrancar Docker
-      systemd:
-        name: docker
-        enabled: true
-        state: started
+      raw: systemctl enable --now docker
 
     - name: 🔴 Crear carpeta y exportación NFS en storage1
       delegate_to: "{{ storage_ip }}"
-      become: true
-      block:
-        - name: Crear carpeta /srv/nfs/traefik-token
-          raw: mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
-
-        - name: Asegurar entrada en /etc/exports
-          raw: |
-            grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
-
-        - name: Aplicar exportfs y reiniciar nfs-server
-          raw: |
-            exportfs -rav
-            systemctl restart nfs-server
+      raw: |
+        mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
+        grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+        exportfs -rav
+        systemctl restart nfs-server
 
     - name: 🔗 Montar NFS con token traefik.jwt desde storage1
       shell: |
@@ -96,13 +62,13 @@
       register: mount_result
       failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
-    - name: 📅 Guardar server-ca.crt en los balanceadores
+    - name: 🗕️ Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name: 🧹 Eliminar ServiceAccount y ClusterRoleBinding previos
+    - name: 🗙️ Eliminar ServiceAccount y ClusterRoleBinding previos
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
@@ -119,25 +85,21 @@
       run_once: true
       raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: 📟 Generar token JWT para traefik-sa
+    - name: 📿 Generar token JWT para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
-    - name: 💾 Guardar token JWT en /mnt/traefik-token
-      shell: |
-        echo '{{ sa_token_jwt.stdout | default('''') | trim }}' > {{ traefik_token_path }} && chmod 0600 {{ traefik_token_path }}
+    - name: 📀 Guardar token JWT en /mnt/traefik-token
+      shell: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ traefik_token_path }} && chmod 0600 {{ traefik_token_path }}
       args:
         executable: /bin/bash
 
-    - name: 💾 Guardar copia del token JWT en storage1
+    - name: 📀 Guardar copia del token JWT en storage1
       delegate_to: "{{ storage_ip }}"
-      become: true
-      shell: echo '{{ sa_token_jwt.stdout | default('''') | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
-      args:
-        executable: /bin/bash
+      raw: echo '{{ sa_token_jwt.stdout | default('') | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
 
     - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
@@ -150,7 +112,7 @@
           --kubeconfig={{ kubeconfig_path }}
 
         kubectl config set-credentials traefik-sa \
-          --token={{ sa_token_jwt.stdout | default('''') | trim }} \
+          --token={{ sa_token_jwt.stdout | default('') | trim }} \
           --kubeconfig={{ kubeconfig_path }}
 
         kubectl config set-context traefik-context \
