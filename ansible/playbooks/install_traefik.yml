@@ -1,4 +1,3 @@
-# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -63,7 +62,7 @@
       register: mount_result
       failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
-    - name: 🕟 Guardar server-ca.crt en los balanceadores
+    - name: 🕒 Guardar server-ca.crt en los balanceadores
       copy:
         content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
@@ -86,25 +85,27 @@
       run_once: true
       raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: 📟 Generar token JWT para traefik-sa
+    - name: 📿 Generar token JWT para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
-    - name: 💾 Guardar token JWT en /mnt/traefik-token
-      copy:
-        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
-        dest: "{{ traefik_token_path }}"
-        mode: "0600"
+    - name: 📀 Guardar token JWT limpio en /mnt/traefik-token
+      shell: |
+        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ traefik_token_path }}
+        chmod 0600 {{ traefik_token_path }}
+      args:
+        executable: /bin/bash
 
-    - name: 💾 Guardar copia del token JWT en storage1
+    - name: 📀 Guardar copia del token JWT limpio en storage1
       delegate_to: "{{ storage_ip }}"
-      copy:
-        content: "{{ sa_token_jwt.stdout | default('') | trim }}"
-        dest: "{{ nfs_backup_token_path }}"
-        mode: "0600"
+      shell: |
+        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }}
+        chmod 0600 {{ nfs_backup_token_path }}
+      args:
+        executable: /bin/bash
 
     - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
@@ -117,7 +118,7 @@
           --kubeconfig={{ kubeconfig_path }}
 
         kubectl config set-credentials traefik-sa \
-          --token={{ sa_token_jwt.stdout | default('') | trim }} \
+          --token={{ sa_token_jwt.stdout | trim }} \
           --kubeconfig={{ kubeconfig_path }}
 
         kubectl config set-context traefik-context \
