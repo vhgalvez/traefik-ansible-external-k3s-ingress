@@ -155,8 +155,9 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🔁 Iniciar o reiniciar contenedor Traefik sin eliminarlo
+    - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
@@ -168,19 +169,3 @@
     - name: 📊 Mostrar estado del contenedor Traefik
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
-
-    - name: 🛠️ Crear unidad systemd para Traefik con Docker Compose
-      template:
-        src: templates/traefik/traefik-docker.service.j2
-        dest: /etc/systemd/system/traefik-docker.service
-        mode: "0644"
-
-    - name: 📦 Recargar systemd para aplicar cambios
-      systemd:
-        daemon_reload: yes
-
-    - name: ✅ Habilitar y arrancar Traefik como servicio systemd
-      systemd:
-        name: traefik-docker.service
-        enabled: true
-        state: started

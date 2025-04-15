@@ -1,0 +1,14 @@
+[Unit]
+Description=Traefik Docker Compose Service
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Restart=always
+WorkingDirectory={{ traefik_config_dir }}
+ExecStart=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
