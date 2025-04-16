@@ -1,58 +1,147 @@
+# ansible\playbooks\install_traefik.yml
 ---
-# 📦 Playbook maestro para actualizar configuración de máquinas externas (extraScrapeConfigs.yaml)
+- name: Instalar y Configurar Traefik como Ingress Controller usando Docker
+  hosts: load_balancers
+  become: true
 
-- name: 🔄 Actualizar objetivos externos de Prometheus
-  hosts: localhost
-  connection: local
-  gather_facts: false
   vars:
-    extra_scrape_config_path: "/tmp/prometheus_manifests/extraScrapeConfigs.yaml"
+    traefik_config_dir: "/etc/traefik"
+    traefik_token_path: "/etc/traefik/token"
+    k8s_api_vip: "10.17.5.10"
+    master1_ip: "10.17.4.21"
 
   tasks:
-    - name: 📁 Crear carpeta para manifests si no existe
-      file:
-        path: "{{ extra_scrape_config_path | dirname }}"
-        state: directory
-        mode: '0755'
+    - name: Copiar certificado CA del API server desde master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
+      register: server_ca_cert
+      changed_when: false
 
-    - name: 🧩 Renderizar archivo extraScrapeConfigs.yaml
-      template:
-        src: "roles/prometheus/templates/extraScrapeConfigs.yaml.j2"
-        dest: "{{ extra_scrape_config_path }}"
-
-    - name: 🔐 Crear o actualizar Secret en Kubernetes
-      command: >
-        /usr/local/bin/kubectl create secret generic prometheus-additional-scrape-configs
-        --from-file=extraScrapeConfigs.yaml={{ extra_scrape_config_path }}
-        --namespace monitoring --dry-run=client -o yaml |
-        /usr/local/bin/kubectl apply -f -
-      environment:
-        KUBECONFIG: "/home/victory/.kube/config"
-
-    - name: ✅ Confirmación
-      debug:
-        msg: "✅ Archivo extraScrapeConfigs.yaml actualizado y Secret aplicado correctamente."
-
-    - name: 📦 Asegurar que el servicio NFS esté habilitado
-      become: true
-      service:
-        name: nfs-server
-        state: started
-        enabled: true
-      when: ansible_facts['os_family'] == "RedHat"
-
-    - name: 🛠️ Crear unidad systemd para Traefik con Docker Compose
-      template:
-        src: templates/traefik/traefik-docker.service.j2
-        dest: /etc/systemd/system/traefik-docker.service
+    - name: Guardar server-ca.crt en los balanceadores
+      copy:
+        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
+        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name: 📦 Recargar systemd para aplicar cambios
-      systemd:
-        daemon_reload: yes
+    - name: Eliminar Podman y herramientas relacionadas
+      package:
+        name:
+          - podman
+          - podman-docker
+          - buildah
+        state: absent
+      ignore_errors: true
 
-    - name: ✅ Habilitar y arrancar Traefik como servicio systemd
+    - name: Eliminar carpetas de contenedores si existen
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/containers
+        - /etc/containers
+      ignore_errors: true
+
+    - name: Instalar Docker CE y plugin docker compose
+      package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: ▶️ Habilitar y arrancar Docker
       systemd:
-        name: traefik-docker.service
+        name: docker
         enabled: true
         state: started
+
+    - name: Crear directorios para Traefik
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/certs"
+        - "{{ traefik_config_dir }}/dynamic_conf"
+
+    - name: Copiar certificados TLS
+      copy:
+        src: "files/certs/traefik.local.{{ item }}"
+        dest: "{{ traefik_config_dir }}/certs/traefik.local.{{ item }}"
+        mode: "0644"
+      loop:
+        - crt
+        - key
+
+    - name: Eliminar traefik.toml si es un directorio por error
+      file:
+        path: "{{ traefik_config_dir }}/traefik.toml"
+        state: absent
+        force: true
+
+    - name: Crear archivo acme.json
+      copy:
+        dest: "{{ traefik_config_dir }}/acme.json"
+        content: "{}"
+        mode: "0600"
+
+    - name: Intentar obtener token de K3s si existe
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        if [ -f /var/lib/rancher/k3s/server/token ]; then
+          cat /var/lib/rancher/k3s/server/token
+        else
+          echo "TOKEN_NOT_FOUND"
+        fi
+      register: sa_token
+      changed_when: false
+
+    - name: Guardar token si fue encontrado
+      raw: |
+        if [ "{{ sa_token.stdout }}" != "TOKEN_NOT_FOUND" ]; then
+          echo "{{ sa_token.stdout | trim }}" > {{ traefik_token_path }}
+        else
+          echo "TOKEN_NOT_FOUND" > {{ traefik_token_path }} # Crea el fichero aunque no encuentre el token.
+        fi
+
+    - name: Verificar si el fichero token existe.
+      stat:
+        path: /etc/traefik/token
+      register: token_file
+
+    - name: ⚙️ Generar traefik.toml
+      template:
+        src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
+        dest: "{{ traefik_config_dir }}/traefik.toml"
+        mode: "0644"
+      vars:
+        traefik_token: "{{ sa_token.stdout }}"
+        vip: "{{ k8s_api_vip }}"
+      when: token_file.stat is defined and "'TOKEN_NOT_FOUND' not in lookup('file', '/etc/traefik/token')"
+
+    - name: Generar archivo docker-compose.yml
+      template:
+        src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
+        dest: "{{ traefik_config_dir }}/docker-compose.yml"
+        mode: "0644"
+      vars:
+        vip: "{{ k8s_api_vip }}"
+
+    - name: Lanzar o reiniciar contenedor Traefik
+      shell: |
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml down || true
+        docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
+      args:
+        executable: /bin/bash
+
+    - name: ✅ Verificar estado del contenedor Traefik
+      shell: docker ps -a | grep traefik
+      register: traefik_status
+
+    - name: Mostrar estado del contenedor Traefik
+      debug:
+        msg: "{{ traefik_status.stdout_lines }}"
