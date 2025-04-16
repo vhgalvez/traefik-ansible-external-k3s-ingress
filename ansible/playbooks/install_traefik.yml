@@ -25,6 +25,34 @@
       raw: mkdir -p /etc/traefik /etc/traefik/certs /etc/traefik/dynamic_conf
       changed_when: false
 
+    - name: 🔒 Verificar si existe el certificado autofirmado
+      stat:
+        path: "{{ traefik_config_dir }}/certs/traefik.crt"
+      register: cert_stat
+
+    - name: 🔑 Verificar si existe la clave privada autofirmada
+      stat:
+        path: "{{ traefik_config_dir }}/certs/traefik.key"
+      register: key_stat
+
+    - name: 🔧 Generar certificado autofirmado traefik.crt y traefik.key si no existen
+      shell: |
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+          -subj "/CN=traefik.local" \
+          -keyout {{ traefik_config_dir }}/certs/traefik.key \
+          -out {{ traefik_config_dir }}/certs/traefik.crt
+      args:
+        executable: /bin/bash
+      when: not cert_stat.stat.exists or not key_stat.stat.exists
+
+    - name: 📁 Establecer permisos seguros para los certificados
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
+        - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
+
     - name: 📁 Crear directorio local para montar NFS (modo raw por compatibilidad)
       raw: mkdir -p /mnt/traefik-token
       changed_when: false
