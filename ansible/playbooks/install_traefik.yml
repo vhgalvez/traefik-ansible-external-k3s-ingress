@@ -1,3 +1,4 @@
+# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -72,19 +73,6 @@
     - name: 📊 Mostrar estado del contenedor Traefik
       debug:
         msg: "Traefik está corriendo: {{ traefik_running.stdout }}"
-    
+
   handlers:
-    - name: 🔄 Reiniciar traefik-docker y recargar systemd
-      block:
-        - name: 🔁 Recargar systemd
-          command: systemctl daemon-reload
-
-        - name: ✅ Habilitar traefik-docker.service para que inicie al arrancar
-          systemd:
-            name: traefik-docker.service
-            enabled: true
-
-        - name: 🔃 Iniciar o reiniciar traefik-docker.service
-          systemd:
-            name: traefik-docker.service
-            state: restarted
+    - import_tasks: "{{ playbook_dir }}/handlers/main.yml"

@@ -1,0 +1,12 @@
+# ansible/playbooks/handlers/main.yml
+- name: 🔄 Reiniciar traefik-docker y recargar systemd
+  become: true
+  block:
+    - name: Recargar systemd
+      command: systemctl daemon-reload
+
+    - name: Reiniciar servicio traefik-docker
+      systemd:
+        name: traefik-docker
+        state: restarted
+        enabled: true
