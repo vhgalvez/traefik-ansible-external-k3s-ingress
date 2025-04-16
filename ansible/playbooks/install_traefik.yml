@@ -1,4 +1,3 @@
-# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -59,31 +58,33 @@
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
 
-    - name: 🧱 Instalar unidad systemd para traefik-docker
+    - name: 🧾 Copiar unidad systemd traefik-docker.service
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik-docker.service.j2"
         dest: "/etc/systemd/system/traefik-docker.service"
         mode: "0644"
+      notify: 🔄 Reiniciar traefik-docker y recargar systemd
 
-    - name: 💠 Recargar daemon de systemd
-      command: systemctl daemon-reexec
-
-    - name: ⚙️ Habilitar traefik-docker para reinicio automático
-      systemd:
-        name: traefik-docker.service
-        enabled: true
-        daemon_reload: true
-
-    - name: 🔃 Iniciar servicio Traefik
-      systemd:
-        name: traefik-docker.service
-        state: restarted
-        enabled: true
-
-    - name: ✅ Verificar estado del contenedor Traefik
-      shell: docker ps -a | grep traefik || true
-      register: traefik_status
+    - name: ✅ Verificar si el contenedor Traefik está corriendo
+      shell: docker inspect -f '{{ "{{ .State.Running }}" }}' traefik || echo false
+      register: traefik_running
 
     - name: 📊 Mostrar estado del contenedor Traefik
       debug:
-        msg: "{{ traefik_status.stdout_lines }}"
+        msg: "Traefik está corriendo: {{ traefik_running.stdout }}"
+    
+  handlers:
+    - name: 🔄 Reiniciar traefik-docker y recargar systemd
+      block:
+        - name: 🔁 Recargar systemd
+          command: systemctl daemon-reload
+
+        - name: ✅ Habilitar traefik-docker.service para que inicie al arrancar
+          systemd:
+            name: traefik-docker.service
+            enabled: true
+
+        - name: 🔃 Iniciar o reiniciar traefik-docker.service
+          systemd:
+            name: traefik-docker.service
+            state: restarted
