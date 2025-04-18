@@ -16,34 +16,34 @@
   tasks:
     # Verificar si el token existe y eliminarlo si es necesario
     - name: Verificar si el token existe en el directorio local
-      stat:
-        path: "{{ traefik_token_path }}"
+      raw: stat {{ traefik_token_path }}
       register: token_check
+      ignore_errors: true
 
     - name: Eliminar token anterior si existe en /mnt/traefik-token
-      shell: rm -rf {{ traefik_token_path }}
-      when: token_check.stat.exists
+      raw: rm -rf {{ traefik_token_path }}
+      when: token_check.rc == 0
 
     # Verificar si el token de respaldo en NFS existe
     - name: Verificar si el token de respaldo existe en storage1
       delegate_to: "{{ storage_ip }}"
-      stat:
-        path: "{{ nfs_backup_token_path }}"
+      raw: stat {{ nfs_backup_token_path }}
       register: nfs_token_check
+      ignore_errors: true
 
     - name: Eliminar copia del token JWT en storage1 si existe
       delegate_to: "{{ storage_ip }}"
-      shell: rm -rf {{ nfs_backup_token_path }}
-      when: nfs_token_check.stat.exists
+      raw: rm -rf {{ nfs_backup_token_path }}
+      when: nfs_token_check.rc == 0
 
     # Verificar si NFS está montado y desmontarlo si es necesario
     - name: Verificar si el NFS está montado
-      shell: mountpoint -q /mnt/traefik-token
+      raw: mountpoint -q /mnt/traefik-token
       register: nfs_mount_status
       ignore_errors: true
 
     - name: Desmontar NFS si ya está montado
-      shell: umount -f /mnt/traefik-token
+      raw: umount -f /mnt/traefik-token
       when: nfs_mount_status.rc == 0
 
     # Crear directorios para Traefik
@@ -53,32 +53,30 @@
 
     # Generación de certificados si no existen
     - name: 🔒 Verificar si existe el certificado autofirmado
-      stat:
-        path: "{{ traefik_config_dir }}/certs/traefik.crt"
+      raw: stat {{ traefik_config_dir }}/certs/traefik.crt
       register: cert_stat
+      ignore_errors: true
 
     - name: 🔑 Verificar si existe la clave privada autofirmada
-      stat:
-        path: "{{ traefik_config_dir }}/certs/traefik.key"
+      raw: stat {{ traefik_config_dir }}/certs/traefik.key
       register: key_stat
+      ignore_errors: true
 
     - name: 🔧 Generar certificado autofirmado traefik.crt y traefik.key si no existen
-      shell: |
+      raw: |
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
           -subj "/CN=traefik.local" \
           -keyout {{ traefik_config_dir }}/certs/traefik.key \
           -out {{ traefik_config_dir }}/certs/traefik.crt
-      args:
-        executable: /bin/bash
-      when: not cert_stat.stat.exists or not key_stat.stat.exists
+      when: cert_stat.rc != 0 or key_stat.rc != 0
 
     - name: 📁 Establecer permisos seguros para los certificados
-      file:
-        path: "{{ item.path }}"
-        mode: "{{ item.mode }}"
-      loop:
-        - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
-        - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
+      raw: chmod 644 {{ traefik_config_dir }}/certs/traefik.crt
+      when: cert_stat.rc != 0
+
+    - name: 📁 Establecer permisos seguros para la clave privada
+      raw: chmod 600 {{ traefik_config_dir }}/certs/traefik.key
+      when: key_stat.rc != 0
 
     # Crear directorio local para montar NFS
     - name: 📁 Crear directorio local para montar NFS (modo raw por compatibilidad)
@@ -109,11 +107,7 @@
 
     # Montar NFS con token traefik.jwt desde storage1
     - name: 🔗 Montar NFS con token traefik.jwt desde storage1
-      shell: |
-        mkdir -p /mnt/traefik-token
-        mountpoint -q /mnt/traefik-token || mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token
-      args:
-        executable: /bin/bash
+      raw: mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token
       register: mount_result
       failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
@@ -126,16 +120,11 @@
       changed_when: false
 
     - name: 📀 Guardar token JWT limpio en /mnt/traefik-token
-      shell: |
-        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ traefik_token_path }}
-        chmod 0600 {{ traefik_token_path }}
-      args:
-        executable: /bin/bash
+      raw: echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ traefik_token_path }} && chmod 0600 {{ traefik_token_path }}
 
     - name: 📀 Guardar copia del token JWT limpio en storage1 (sin usar Python)
       delegate_to: "{{ storage_ip }}"
-      raw: |
-        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
+      raw: echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
 
     # Continuar con la configuración de Traefik
     - name: ⚙️ Generar kubeconfig para Traefik
@@ -178,10 +167,7 @@
         vip: "{{ k8s_api_vip }}"
 
     - name: Eliminar acme.json si es un directorio por error
-      file:
-        path: "{{ traefik_config_dir }}/acme.json"
-        state: absent
-        force: true
+      raw: rm -rf {{ traefik_config_dir }}/acme.json
 
     - name: Crear archivo acme.json correctamente
       copy:
