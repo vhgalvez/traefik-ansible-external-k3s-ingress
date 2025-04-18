@@ -1,5 +1,5 @@
 # ansible\playbooks\install_traefik.yml
----
+--- 
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -21,7 +21,7 @@
       register: token_check
 
     - name: Eliminar token anterior si existe en /mnt/traefik-token
-      shell: rm -f {{ traefik_token_path }}
+      shell: rm -rf {{ traefik_token_path }}
       when: token_check.stat.exists
 
     # Verificar si el token de respaldo en NFS existe
@@ -33,7 +33,7 @@
 
     - name: Eliminar copia del token JWT en storage1 si existe
       delegate_to: "{{ storage_ip }}"
-      shell: rm -f {{ nfs_backup_token_path }}
+      shell: rm -rf {{ nfs_backup_token_path }}
       when: nfs_token_check.stat.exists
 
     # Verificar si NFS está montado y desmontarlo si es necesario
