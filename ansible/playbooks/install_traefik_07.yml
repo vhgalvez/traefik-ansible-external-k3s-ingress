@@ -14,44 +14,17 @@
     storage_ip: "10.17.4.27"
 
   tasks:
-    # Verificar si el token existe y eliminarlo si es necesario
-    - name: Verificar si el token existe en el directorio local
-      stat:
-        path: "{{ traefik_token_path }}"
-      register: token_check
+    - name: 📄 Copiar certificado CA del API server desde master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
+      register: server_ca_cert
+      changed_when: false
 
-    - name: Eliminar token anterior si existe en /mnt/traefik-token
-      shell: rm -f {{ traefik_token_path }}
-      when: token_check.stat.exists
-
-    # Verificar si el token de respaldo en NFS existe
-    - name: Verificar si el token de respaldo existe en storage1
-      delegate_to: "{{ storage_ip }}"
-      stat:
-        path: "{{ nfs_backup_token_path }}"
-      register: nfs_token_check
-
-    - name: Eliminar copia del token JWT en storage1 si existe
-      delegate_to: "{{ storage_ip }}"
-      shell: rm -f {{ nfs_backup_token_path }}
-      when: nfs_token_check.stat.exists
-
-    # Verificar si NFS está montado y desmontarlo si es necesario
-    - name: Verificar si el NFS está montado
-      shell: mountpoint -q /mnt/traefik-token
-      register: nfs_mount_status
-      ignore_errors: true
-
-    - name: Desmontar NFS si ya está montado
-      shell: umount -f /mnt/traefik-token
-      when: nfs_mount_status.rc == 0
-
-    # Crear directorios para Traefik
     - name: 📁 Crear directorios para Traefik
       raw: mkdir -p /etc/traefik /etc/traefik/certs /etc/traefik/dynamic_conf
       changed_when: false
 
-    # Generación de certificados si no existen
     - name: 🔒 Verificar si existe el certificado autofirmado
       stat:
         path: "{{ traefik_config_dir }}/certs/traefik.crt"
@@ -80,12 +53,15 @@
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
 
-    # Crear directorio local para montar NFS
     - name: 📁 Crear directorio local para montar NFS (modo raw por compatibilidad)
       raw: mkdir -p /mnt/traefik-token
       changed_when: false
 
-    # Instalar Docker y dependencias necesarias
+    - name: ❌ Eliminar Podman y herramientas relacionadas
+      raw: |
+        dnf remove -y podman podman-docker buildah || true
+        rm -rf /var/lib/containers /etc/containers || true
+
     - name: 🛠️ Instalar dnf-plugins-core
       raw: dnf install -y dnf-plugins-core
 
@@ -98,16 +74,15 @@
     - name: ▶️ Habilitar y arrancar Docker
       raw: systemctl enable --now docker
 
-    # Crear carpeta y exportación NFS en storage1
     - name: 🔴 Crear carpeta y exportación NFS en storage1
       delegate_to: "{{ storage_ip }}"
       raw: |
         mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
         grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
         exportfs -rav
+        
         systemctl restart nfs-server
 
-    # Montar NFS con token traefik.jwt desde storage1
     - name: 🔗 Montar NFS con token traefik.jwt desde storage1
       shell: |
         mkdir -p /mnt/traefik-token
@@ -117,7 +92,29 @@
       register: mount_result
       failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
-    # Generación de token JWT
+    - name: 🕒 Guardar server-ca.crt en los balanceadores
+      copy:
+        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
+        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
+        mode: "0644"
+
+    - name: ❌ Eliminar ServiceAccount y ClusterRoleBinding previos
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: |
+        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
+        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
+
+    - name: 🛡 Crear ServiceAccount para Traefik
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: kubectl create sa traefik-sa --namespace default || true
+
+    - name: 🔐 Crear ClusterRoleBinding para traefik-sa
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+
     - name: 📿 Generar token JWT para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
@@ -137,7 +134,6 @@
       raw: |
         echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
 
-    # Continuar con la configuración de Traefik
     - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
@@ -160,7 +156,6 @@
         kubectl config use-context traefik-context \
           --kubeconfig={{ kubeconfig_path }}
 
-    # Configuración de Traefik
     - name: 🔧 Generar traefik.toml
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
