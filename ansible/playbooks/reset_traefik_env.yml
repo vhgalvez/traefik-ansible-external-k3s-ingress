@@ -27,11 +27,10 @@
       args:
         executable: /bin/bash
 
-    - name: 🧹 Borrar volumen NFS remoto del token traefik.jwt
+    - name: 🧹 Borrar volumen NFS remoto del token traefik.jwt (modo raw)
       delegate_to: "{{ storage_ip }}"
-      file:
-        path: "{{ nfs_backup_token_path }}"
-        state: absent
+      raw: rm -f {{ nfs_backup_token_path }}
+
 
     - name: 🧹 Eliminar configuración traefik local si deseas (opcional)
       file:
