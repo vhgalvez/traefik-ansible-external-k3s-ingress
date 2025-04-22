@@ -1,0 +1,40 @@
+---
+- name: 🔁 Reset completo del entorno Traefik (token, NFS, contenedor)
+  hosts: load_balancers
+  become: true
+
+  vars:
+    traefik_config_dir: "/etc/traefik"
+    traefik_token_path: "/mnt/traefik-token/traefik.jwt"
+    nfs_backup_token_path: "/srv/nfs/traefik-token/traefik.jwt"
+    storage_ip: "10.17.4.27"
+
+  tasks:
+
+    - name: ❌ Desmontar NFS si está montado
+      shell: |
+        mountpoint -q /mnt/traefik-token && umount -f /mnt/traefik-token || true
+      args:
+        executable: /bin/bash
+
+    - name: 🧹 Eliminar token JWT local si existe
+      file:
+        path: "{{ traefik_token_path }}"
+        state: absent
+
+    - name: 🧹 Eliminar contenedor traefik si existe
+      shell: docker rm -f traefik || true
+      args:
+        executable: /bin/bash
+
+    - name: 🧹 Borrar volumen NFS remoto del token traefik.jwt
+      delegate_to: "{{ storage_ip }}"
+      file:
+        path: "{{ nfs_backup_token_path }}"
+        state: absent
+
+    - name: 🧹 Eliminar configuración traefik local si deseas (opcional)
+      file:
+        path: "{{ traefik_config_dir }}"
+        state: absent
+      when: traefik_config_dir is defined and traefik_config_dir != ""
