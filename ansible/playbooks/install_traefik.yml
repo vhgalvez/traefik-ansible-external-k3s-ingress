@@ -12,23 +12,19 @@
     storage_ip: "10.17.4.27"
 
   tasks:
-    - name: 🧹 Verificar y eliminar contenedor Traefik y su configuración
-      block:
-        - name: Verificar si el contenedor de Traefik existe
-          shell: docker ps -a -q --filter "name=traefik"
-          register: traefik_container
-          changed_when: false
-          failed_when: false
+    
+    # Verificar si el contenedor de Traefik existe
+    - name: Verificar si el contenedor de Traefik existe
+      shell: docker ps -a -q --filter "name=traefik"
+      register: traefik_container
+      changed_when: false
+      failed_when: false
 
-        - name: Eliminar contenedor de Traefik si existe
-          shell: docker rm -f traefik
-          when: traefik_container.stdout != ""
-          ignore_errors: true
-
-        - name: Eliminar directorio de configuración de Traefik
-          file:
-            path: /etc/traefik
-            state: absent
+    # Eliminar el contenedor de Traefik si existe
+    - name: Eliminar contenedor de Traefik si ya existe
+      shell: docker rm -f traefik
+      when: traefik_container.stdout != ""
+      ignore_errors: true
 
     - name: 📄 Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
@@ -188,6 +184,11 @@
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
+
+    - name: 🤩 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
+      shell: docker rm -f traefik || true
+      args:
+        executable: /bin/bash
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
       shell: docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
