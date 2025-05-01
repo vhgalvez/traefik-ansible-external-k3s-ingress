@@ -29,7 +29,10 @@
       changed_when: false
 
     - name: 📁 Crear directorios para Traefik
-      raw: mkdir -p /etc/traefik /etc/traefik/certs /etc/traefik/dynamic_conf
+      file:
+        path: "{{ traefik_config_dir }}/certs"
+        state: directory
+        mode: "0755"
       changed_when: false
 
     - name: 🔒 Verificar si existe el certificado autofirmado

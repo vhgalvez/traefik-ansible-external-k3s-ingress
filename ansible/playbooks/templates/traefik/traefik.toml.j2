@@ -1,19 +1,25 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
+
   [entryPoints.websecure]
     address = ":443"
+
   [entryPoints.traefik]
     address = ":8080"
 
 [api]
   dashboard = true
   insecure = false  # Cambia a false y configura autenticación segura
-  [api.security]
-    [api.security.basicAuth]
-      users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
+  [api.auth.basic]
+    users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
 
+[log]
   level = "DEBUG"
+
+[providers.file]
+  directory = "/etc/traefik/dynamic_conf"
+  watch = true
 
 [providers.kubernetesIngress]
   kubeconfigFile = "/etc/traefik/traefik-kubeconfig.yaml"
