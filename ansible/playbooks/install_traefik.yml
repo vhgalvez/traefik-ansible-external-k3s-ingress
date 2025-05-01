@@ -21,6 +21,20 @@
       when: kubeconfig_path | basename == 'traefik-kubeconfig.yaml'
       ignore_errors: true
 
+    # Verificar si el archivo kubeconfig existe en master1
+    - name: 🔍 Verificar si kubeconfig existe en master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      command: test -f /etc/traefik/traefik-kubeconfig.yaml
+      register: kubeconfig_exists
+      ignore_errors: true
+
+    - name: ❌ Abortamos si el archivo kubeconfig no existe en master1
+      fail:
+        msg: "El archivo kubeconfig no se encontró en master1. Verifica la creación del archivo."
+      when: kubeconfig_exists.rc != 0
+
+    # Copiar certificado CA del API server desde master1
     - name: 📄 Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
@@ -35,98 +49,15 @@
         mode: "0755"
       changed_when: false
 
-    - name: 🔒 Verificar si existe el certificado autofirmado
-      stat:
-        path: "{{ traefik_config_dir }}/certs/traefik.crt"
-      register: cert_stat
-
-    - name: 🔐 Verificar si existe la clave privada autofirmada
-      stat:
-        path: "{{ traefik_config_dir }}/certs/traefik.key"
-      register: key_stat
-
-    - name: 🔧 Generar certificado autofirmado traefik.crt y traefik.key si no existen
-      shell: |
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-          -subj "/CN=traefik.local" \
-          -keyout {{ traefik_config_dir }}/certs/traefik.key \
-          -out {{ traefik_config_dir }}/certs/traefik.crt
-      args:
-        executable: /bin/bash
-      when: not cert_stat.stat.exists or not key_stat.stat.exists
-
-    - name: 📁 Establecer permisos seguros para los certificados
+    # Crear directorio para kubeconfig si no existe
+    - name: 📁 Crear directorio para kubeconfig si no existe
       file:
-        path: "{{ item.path }}"
-        mode: "{{ item.mode }}"
-      loop:
-        - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
-        - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
+        path: "{{ traefik_config_dir }}"
+        state: directory
+        mode: "0755"
 
-    # Instalar Docker y herramientas
-    - name: 💪 Instalar dnf-plugins-core
-      raw: dnf install -y dnf-plugins-core
-
-    - name: ➕ Añadir repositorio oficial de Docker
-      raw: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-    - name: 🚓 Instalar Docker CE y Docker Compose Plugin
-      raw: dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-    - name: ▶️ Habilitar y arrancar Docker
-      raw: systemctl enable --now docker
-
-    # Exportar NFS
-    - name: 🔴 Crear carpeta y exportación NFS en storage1
-      delegate_to: "{{ storage_ip }}"
-      raw: |
-        mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
-        grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
-        exportfs -rav
-        systemctl restart nfs-server
-
-    - name: 🔗 Montar NFS desde storage1
-      shell: |
-        mkdir -p /mnt/traefik-token
-        mountpoint -q /mnt/traefik-token || mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token
-      args:
-        executable: /bin/bash
-      register: mount_result
-      failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
-
-    # Guardar certificado
-    - name: 🕒 Guardar server-ca.crt en los balanceadores
-      copy:
-        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
-        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
-        mode: "0644"
-
-    # Generar el kubeconfig para Traefik
-    - name: ⚙️ Generar kubeconfig para Traefik (solo en master1)
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: |
-        kubectl config set-cluster k3s-cluster \
-          --server=https://{{ k8s_api_vip }}:6443 \
-          --certificate-authority=/var/lib/rancher/k3s/server/tls/server-ca.crt \
-          --embed-certs=true \
-          --kubeconfig={{ kubeconfig_path }}
-
-        kubectl config set-credentials traefik-sa \
-          --token=$(kubectl -n default create token traefik-sa) \
-          --kubeconfig={{ kubeconfig_path }}
-
-        kubectl config set-context traefik-context \
-          --cluster=k3s-cluster \
-          --user=traefik-sa \
-          --kubeconfig={{ kubeconfig_path }}
-
-        kubectl config use-context traefik-context \
-          --kubeconfig={{ kubeconfig_path }}
-
-        chmod 0600 {{ kubeconfig_path }}
-
-    - name: 🗓️ Copiar kubeconfig al storage1 (desde localhost usando doble scp robusto)
+    # Copiar kubeconfig desde master1
+    - name: 🗓️ Copiar kubeconfig desde master1 a load balancer
       run_once: true
       delegate_to: localhost
       shell: |
@@ -138,36 +69,33 @@
             -o StrictHostKeyChecking=no \
             core@{{ master1_ip }}:{{ kubeconfig_path }} ${TMP_KUBECONFIG}
 
-        echo "📄 Subiendo kubeconfig a storage1..."
+        echo "📄 Subiendo kubeconfig a load balancer..."
         scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
             -o StrictHostKeyChecking=no \
-            ${TMP_KUBECONFIG} core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
+            ${TMP_KUBECONFIG} core@{{ inventory_hostname }}:{{ kubeconfig_path }}
 
         echo "🪟 Limpiando archivo temporal..."
         rm -f ${TMP_KUBECONFIG}
       args:
         executable: /bin/bash
 
-    # Verificar que el archivo kubeconfig existe
-    - name: ✅ Verificar que kubeconfig se copió correctamente en storage1 (modo raw para Flatcar)
-      run_once: true
-      delegate_to: "{{ storage_ip }}"
-      raw: test -f {{ kubeconfig_backup_path }}
+    # Verificar que el archivo kubeconfig se copió correctamente
+    - name: ✅ Verificar que kubeconfig se copió correctamente en load balancer
+      raw: test -f {{ kubeconfig_path }}
       register: kubeconfig_check
       ignore_errors: true
 
-    - name: ❌ Abortamos si kubeconfig no se copió a storage1
-      run_once: true
+    - name: ❌ Abortamos si kubeconfig no se copió a load balancer
       fail:
-        msg: "El archivo kubeconfig no se encontró en {{ kubeconfig_backup_path }}. Revisa el paso de doble scp."
+        msg: "El archivo kubeconfig no se encontró en {{ kubeconfig_path }}. Revisa el paso de scp."
       when: kubeconfig_check.rc != 0
 
-    - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
-      delegate_to: "{{ storage_ip }}"
-      run_once: true
-      raw: chmod 0600 {{ kubeconfig_backup_path }}
+    - name: 🔐 Establecer permisos del kubeconfig en load balancer
+      file:
+        path: "{{ kubeconfig_path }}"
+        mode: "0600"
 
-    # Configuración final de Traefik
+    # Restante de configuración de Traefik
     - name: 🔧 Generar traefik.toml
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
