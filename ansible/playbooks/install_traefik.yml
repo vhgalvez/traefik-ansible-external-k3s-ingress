@@ -67,7 +67,7 @@
     - name: ➕ Añadir repositorio oficial de Docker
       raw: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 
-    - name: 🛳️ Instalar Docker CE y Docker Compose Plugin
+    - name: 🛣️ Instalar Docker CE y Docker Compose Plugin
       raw: dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
     - name: ▶️ Habilitar y arrancar Docker
@@ -137,21 +137,23 @@
 
         chmod 0600 {{ kubeconfig_path }}
 
-    - name: 📅 Descargar kubeconfig desde master1 al nodo Ansible (localhost)
-      fetch:
-        src: "{{ kubeconfig_path }}"
-        dest: "/tmp/traefik-kubeconfig.yaml"
-        flat: true
-      delegate_to: "{{ master1_ip }}"
+    - name: 📅 Copiar kubeconfig al storage1 (desde localhost usando doble scp)
       run_once: true
+      delegate_to: localhost
+      shell: |
+        TMP_KUBECONFIG="/tmp/traefik-kubeconfig.yaml"
 
-    - name: 📄 Subir kubeconfig al nodo storage1
-      copy:
-        src: "/tmp/traefik-kubeconfig.yaml"
-        dest: "{{ kubeconfig_backup_path }}"
-        mode: "0600"
-      delegate_to: "{{ storage_ip }}"
-      run_once: true
+        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
+            -o StrictHostKeyChecking=no \
+            core@{{ master1_ip }}:{{ kubeconfig_path }} ${TMP_KUBECONFIG}
+
+        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
+            -o StrictHostKeyChecking=no \
+            ${TMP_KUBECONFIG} core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
+
+        rm -f ${TMP_KUBECONFIG}
+      args:
+        executable: /bin/bash
 
     - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
       delegate_to: "{{ storage_ip }}"
@@ -166,7 +168,7 @@
       vars:
         vip: "{{ k8s_api_vip }}"
 
-    - name: 🛳️ Generar archivo docker-compose.yml
+    - name: 🛣️ Generar archivo docker-compose.yml
       template:
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
@@ -186,7 +188,7 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🩹 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
+    - name: 🦩 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
       shell: docker rm -f traefik || true
       args:
         executable: /bin/bash
