@@ -1,18 +1,18 @@
-[Unit]
-Description=Traefik Docker Compose Service
-Requires=docker.service
-After=docker.service network-online.target
-Wants=network-online.target
+version: "3.9"
 
-[Service]
-Type=simple
-RemainAfterExit=true
-ExecStartPre=/bin/bash -c '[ -f {{ kubeconfig_path }} ]'
-WorkingDirectory={{ traefik_config_dir }}
-ExecStart=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
-ExecStop=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml down
-TimeoutStartSec=0
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"         # HTTP
+      - "443:443"       # HTTPS
+      - "8080:8080"     # Traefik Dashboard (⚠️ cambiar seguridad más adelante)
+    volumes:
+      - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
+      - /etc/traefik/acme.json:/acme.json
+      - /etc/traefik/certs:/etc/traefik/certs:ro
+      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/kubeconfig:ro
+    environment:
+      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false

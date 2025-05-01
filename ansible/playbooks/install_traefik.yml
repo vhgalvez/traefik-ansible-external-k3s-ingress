@@ -1,5 +1,5 @@
 # ansible/playbooks/install_traefik.yml
----
+--- 
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -42,6 +42,7 @@
       register: server_ca_cert
       changed_when: false
 
+    # Crear directorios para Traefik
     - name: 📁 Crear directorios para Traefik
       file:
         path: "{{ traefik_config_dir }}/certs"
@@ -66,44 +67,35 @@
       command: chmod 755 /etc/traefik
       when: dir_permissions.rc != 0
 
-    # Copiar kubeconfig desde master1 a load balancer
-    - name: 🗓️ Copiar kubeconfig desde master1 a load balancer
+    # Fetch kubeconfig from master1 to Ansible controller
+    - name: 🗂 Fetch kubeconfig from master1 to Ansible controller
+      fetch:
+        src: "{{ kubeconfig_path }}"
+        dest: "/tmp/traefik-kubeconfig.yaml"
+        flat: yes
+      delegate_to: "{{ master1_ip }}"
       run_once: true
-      delegate_to: localhost
-      shell: |
-        set -e
-        TMP_KUBECONFIG="/tmp/traefik-kubeconfig.yaml"
+      become: false  # Ensure we fetch as the core user
 
-        echo "🗓️ Descargando kubeconfig desde master1..."
-        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
-            -o StrictHostKeyChecking=no \
-            core@{{ master1_ip }}:{{ kubeconfig_path }} ${TMP_KUBECONFIG}
-
-        echo "📄 Subiendo kubeconfig a load balancer..."
-        sudo scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
-            -o StrictHostKeyChecking=no \
-            ${TMP_KUBECONFIG} core@{{ inventory_hostname }}:/etc/traefik/traefik-kubeconfig.yaml
-
-        echo "🪟 Limpiando archivo temporal..."
-        rm -f ${TMP_KUBECONFIG}
-      args:
-        executable: /bin/bash
-
-    # Verificar que el archivo kubeconfig se copió correctamente
-    - name: ✅ Verificar que kubeconfig se copió correctamente en load balancer
-      raw: test -f {{ kubeconfig_path }}
-      register: kubeconfig_check
-      ignore_errors: true
-
-    - name: ❌ Abortamos si kubeconfig no se copió a load balancer
-      fail:
-        msg: "El archivo kubeconfig no se encontró en {{ kubeconfig_path }}. Revisa el paso de scp."
-      when: kubeconfig_check.rc != 0
-
-    - name: 🔐 Establecer permisos del kubeconfig en load balancer
-      file:
-        path: "{{ kubeconfig_path }}"
+    # Copiar kubeconfig a cada load balancer
+    - name: 📤 Copiar kubeconfig a cada load balancer
+      copy:
+        src: "/tmp/traefik-kubeconfig.yaml"
+        dest: "{{ kubeconfig_path }}"
+        owner: root
+        group: root
         mode: "0600"
+      become: true  # Ensure root permissions on load balancer
+      loop: "{{ groups['load_balancers'] }}"
+      loop_control:
+        loop_var: inventory_hostname
+
+    - name: 🧹 Limpiar archivo temporal de kubeconfig
+      file:
+        path: "/tmp/traefik-kubeconfig.yaml"
+        state: absent
+      delegate_to: localhost
+      run_once: true
 
     # Restante de configuración de Traefik
     - name: 🔧 Generar traefik.toml
