@@ -1,7 +1,7 @@
 [http.middlewares.auth.basicAuth]
   usersFile = "/etc/traefik/secrets/users.htpasswd"
 
-[http.middlewares.internal-whitelist.ipWhiteList]
+[http.middlewares.internal-whitelist.ipAllowList]
   sourceRange = [
     "192.168.1.0/24",
     "10.17.0.0/16",
