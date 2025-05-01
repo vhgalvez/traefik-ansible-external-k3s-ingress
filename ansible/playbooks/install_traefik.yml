@@ -176,7 +176,6 @@
       register: kubeconfig_check
       ignore_errors: true
 
-
     - name: ❌ Abortamos si kubeconfig no se copio a storage1
       run_once: true
       fail:
