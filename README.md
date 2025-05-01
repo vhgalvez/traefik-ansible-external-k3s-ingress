@@ -215,6 +215,17 @@ traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 
 https://www.md5hashgenerator.com/
 
+🟢 En Ubuntu / Debian:
+bash
+Copiar
+Editar
+sudo apt update
+sudo apt install apache2-utils
+🔵 En Rocky / AlmaLinux / CentOS:
+bash
+Copiar
+Editar
+sudo dnf install httpd-tools
 
 sudo apt update
 sudo apt install apache2-utils
