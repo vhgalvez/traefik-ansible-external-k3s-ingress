@@ -1,5 +1,5 @@
 # ansible/playbooks/install_traefik.yml
---- 
+---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -56,7 +56,17 @@
         state: directory
         mode: "0755"
 
-    # Copiar kubeconfig desde master1
+    # Verificar permisos del directorio de destino
+    - name: Verificar permisos de /etc/traefik
+      command: ls -ld /etc/traefik
+      register: dir_permissions
+      ignore_errors: true
+
+    - name: Establecer permisos de escritura en /etc/traefik
+      command: chmod 755 /etc/traefik
+      when: dir_permissions.rc != 0
+
+    # Copiar kubeconfig desde master1 a load balancer
     - name: 🗓️ Copiar kubeconfig desde master1 a load balancer
       run_once: true
       delegate_to: localhost
@@ -72,7 +82,7 @@
         echo "📄 Subiendo kubeconfig a load balancer..."
         sudo scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
             -o StrictHostKeyChecking=no \
-            ${TMP_KUBECONFIG} core@{{ inventory_hostname }}:{{ kubeconfig_path }}
+            ${TMP_KUBECONFIG} core@{{ inventory_hostname }}:/etc/traefik/traefik-kubeconfig.yaml
 
         echo "🪟 Limpiando archivo temporal..."
         rm -f ${TMP_KUBECONFIG}
