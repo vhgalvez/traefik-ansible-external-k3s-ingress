@@ -8,15 +8,15 @@
 
 [api]
   dashboard = true
-  insecure = true  # ⚠️ Cambia a false cuando configures autenticación
+  insecure = false  # Cambia a false y configura autenticación segura
+  [api.auth.basic]
+    users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]  # Reemplaza esto con tu usuario y contraseña cifrada
 
 [log]
   level = "DEBUG"
 
 [providers.kubernetesIngress]
-  endpoint = "https://{{ vip }}:6443"
-  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-  certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
+  kubeconfigFile = "/etc/traefik/traefik-kubeconfig.yaml"
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]

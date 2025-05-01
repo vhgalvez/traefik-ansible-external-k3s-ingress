@@ -14,5 +14,7 @@ services:
       - {{ traefik_config_dir }}/acme.json:/acme.json
       - {{ traefik_config_dir }}/certs:/etc/traefik/certs:ro
       - {{ kubeconfig_path }}:/etc/traefik/kubeconfig:ro
+      - ./traefik.toml:/etc/traefik/traefik.toml:ro
+      - ./traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
     environment:
       - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
