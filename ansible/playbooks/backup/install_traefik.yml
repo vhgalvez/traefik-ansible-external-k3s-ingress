@@ -6,8 +6,9 @@
 
   vars:
     traefik_config_dir: "/etc/traefik"
+    traefik_token_path: "/mnt/traefik-token/traefik.jwt"
+    nfs_backup_token_path: "/srv/nfs/traefik-token/traefik.jwt"
     kubeconfig_path: "/etc/traefik/traefik-kubeconfig.yaml"
-    kubeconfig_backup_path: "/srv/nfs/traefik-token/traefik-kubeconfig.yaml"
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
     storage_ip: "10.17.4.27"
@@ -79,9 +80,10 @@
         mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
         grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
         exportfs -rav
+        
         systemctl restart nfs-server
 
-    - name: 🔗 Montar NFS desde storage1
+    - name: 🔗 Montar NFS con token traefik.jwt desde storage1
       shell: |
         mkdir -p /mnt/traefik-token
         mountpoint -q /mnt/traefik-token || mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token
@@ -120,7 +122,19 @@
       register: sa_token_jwt
       changed_when: false
 
-    - name: ⚙️ Generar kubeconfig para Traefik (y backup en NFS)
+    - name: 📀 Guardar token JWT limpio en /mnt/traefik-token
+      shell: |
+        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ traefik_token_path }}
+        chmod 0600 {{ traefik_token_path }}
+      args:
+        executable: /bin/bash
+
+    - name: 📀 Guardar copia del token JWT limpio en storage1 (sin usar Python)
+      delegate_to: "{{ storage_ip }}"
+      raw: |
+        echo -n '{{ sa_token_jwt.stdout | trim }}' > {{ nfs_backup_token_path }} && chmod 0600 {{ nfs_backup_token_path }}
+
+    - name: ⚙️ Generar kubeconfig para Traefik
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
@@ -141,9 +155,6 @@
 
         kubectl config use-context traefik-context \
           --kubeconfig={{ kubeconfig_path }}
-
-        cp -f {{ kubeconfig_path }} {{ kubeconfig_backup_path }}
-        chmod 0600 {{ kubeconfig_path }} {{ kubeconfig_backup_path }}
 
     - name: 🔧 Generar traefik.toml
       template:
@@ -179,7 +190,7 @@
       args:
         executable: /bin/bash
 
-    - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
+    - name: ↺ Reiniciar contenedor Traefik con nuevo token
       shell: |
         docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:

@@ -13,6 +13,6 @@ services:
       - {{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro
       - {{ traefik_config_dir }}/acme.json:/acme.json
       - {{ traefik_config_dir }}/certs:/etc/traefik/certs:ro
-      - {{ traefik_token_path }}:/var/run/secrets/kubernetes.io/serviceaccount/token:ro
+      - {{ kubeconfig_path }}:/etc/traefik/kubeconfig:ro
     environment:
       - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false

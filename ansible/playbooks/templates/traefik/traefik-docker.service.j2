@@ -11,7 +11,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=true
-ExecStartPre=/bin/bash -c '[ -f {{ traefik_token_path }} ]'
+ExecStartPre=/bin/bash -c '[ -f {{ kubeconfig_path }} ]'
 WorkingDirectory={{ traefik_config_dir }}
 ExecStart=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
 ExecStop=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml down

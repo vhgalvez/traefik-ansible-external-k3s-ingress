@@ -1,3 +1,4 @@
+# ansible\playbooks\generate_selfsigned_certs.yml
 ---
 - name: 🛡️ Generar certificados autofirmados para Traefik
   hosts: load_balancers

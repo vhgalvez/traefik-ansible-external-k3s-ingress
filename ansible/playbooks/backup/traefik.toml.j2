@@ -14,7 +14,9 @@
   level = "DEBUG"
 
 [providers.kubernetesIngress]
-  kubeconfig = "/etc/traefik/kubeconfig"
+  endpoint = "https://{{ vip }}:6443"
+  token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  certAuthFilePath = "/etc/traefik/certs/server-ca.crt"
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]
