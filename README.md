@@ -214,3 +214,9 @@ traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 
 https://www.md5hashgenerator.com/
+
+
+htpasswd -nb admin 123456
+
+
+admin:$apr1$EmwxsRBo$wxwfDVIUfvrM.LFk4AWsr1
