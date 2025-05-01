@@ -169,18 +169,18 @@
       args:
         executable: /bin/bash
 
-    - name: ✅ Verificar que kubeconfig se copió correctamente en storage1
+    - name: ✅ Verificar que kubeconfig se copió correctamente en storage1 (modo raw para Flatcar)
       run_once: true
       delegate_to: "{{ storage_ip }}"
-      stat:
-        path: "{{ kubeconfig_backup_path }}"
-      register: kubeconfig_storage_stat
+      raw: test -f {{ kubeconfig_backup_path }}
+      register: kubeconfig_check
+      ignore_errors: true
 
     - name: ❌ Abortamos si kubeconfig no se copió a storage1
       run_once: true
       fail:
         msg: "El archivo kubeconfig no se encontró en {{ kubeconfig_backup_path }}. Revisa el paso de doble scp."
-      when: not kubeconfig_storage_stat.stat.exists
+      when: kubeconfig_check.rc != 0
 
     - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
       delegate_to: "{{ storage_ip }}"
