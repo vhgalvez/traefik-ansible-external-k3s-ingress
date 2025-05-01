@@ -6,20 +6,38 @@
   vars:
     traefik_config_dir: "/etc/traefik"
     kubeconfig_path: "/etc/traefik/traefik-kubeconfig.yaml"
+    kubeconfig_backup_path: "/srv/nfs/traefik-token/traefik-kubeconfig.yaml"
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
     storage_ip: "10.17.4.27"
 
   tasks:
 
-    - name: 🧨 Limpiar artefactos previos
-      shell: |
-        rm -rf {{ traefik_config_dir }}/* {{ traefik_config_dir }}/.* 2>/dev/null || true
-      args:
-        executable: /bin/bash
+    - name: Verificar si el contenedor de Traefik existe
+      shell: sudo docker ps -a -q --filter "name=traefik"
+      register: traefik_container
+      changed_when: false
+      failed_when: false
+
+    - name: Eliminar contenedor de Traefik si ya existe
+      shell: sudo docker rm -f traefik
+      when: traefik_container.stdout != ""
       ignore_errors: true
 
-    - name: 🛠️ Crear estructura de directorios limpia
+    - name: 🧹 Eliminar /etc/traefik si existe
+      file:
+        path: /etc/traefik
+        state: absent
+        force: true
+
+    - name: 📄 Copiar certificado CA del API server desde master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
+      register: server_ca_cert
+      changed_when: false
+
+    - name: 📁 Crear directorios necesarios para Traefik
       file:
         path: "{{ item }}"
         state: directory
@@ -29,44 +47,35 @@
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
 
-    - name: 🚧 Eliminar contenedor de Traefik si ya existe
-      shell: docker rm -f traefik || true
-      args:
-        executable: /bin/bash
-      ignore_errors: true
-
-    - name: 📄 Copiar server-ca.crt desde master1
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
-      register: server_ca_cert
-      changed_when: false
-
-    - name: 🗂️ Guardar server-ca.crt en los balanceadores
-      copy:
-        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
-        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
-        mode: "0644"
-
-    - name: 🔐 Verificar existencia de certificados
-      stat:
+    - name: 🚨 Eliminar archivos mal creados como directorios
+      file:
         path: "{{ item }}"
-      register: cert_stat
+        state: absent
       loop:
-        - "{{ traefik_config_dir }}/certs/traefik.crt"
-        - "{{ traefik_config_dir }}/certs/traefik.key"
+        - "{{ traefik_config_dir }}/traefik.toml"
+        - "{{ traefik_config_dir }}/traefik-kubeconfig.yaml"
 
-    - name: 🔏 Generar certificados autofirmados si faltan
+    - name: 🔒 Verificar si existe el certificado autofirmado
+      stat:
+        path: "{{ traefik_config_dir }}/certs/traefik.crt"
+      register: cert_stat
+
+    - name: 🔐 Verificar si existe la clave privada autofirmada
+      stat:
+        path: "{{ traefik_config_dir }}/certs/traefik.key"
+      register: key_stat
+
+    - name: 🔧 Generar certificado autofirmado traefik.crt y traefik.key si no existen
       shell: |
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -subj "/CN=traefik.local" \
-        -keyout {{ traefik_config_dir }}/certs/traefik.key \
-        -out {{ traefik_config_dir }}/certs/traefik.crt
-      when: not cert_stat.results[0].stat.exists or not cert_stat.results[1].stat.exists
+          -subj "/CN=traefik.local" \
+          -keyout {{ traefik_config_dir }}/certs/traefik.key \
+          -out {{ traefik_config_dir }}/certs/traefik.crt
       args:
         executable: /bin/bash
+      when: not cert_stat.stat.exists or not key_stat.stat.exists
 
-    - name: 🔒 Establecer permisos a certificados
+    - name: 📁 Establecer permisos seguros para los certificados
       file:
         path: "{{ item.path }}"
         mode: "{{ item.mode }}"
@@ -74,41 +83,81 @@
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
 
-    - name: 🧰 Crear directorio para NFS token
+    - name: 📁 Crear directorio local para montar NFS
       file:
         path: /mnt/traefik-token
         state: directory
         mode: "0755"
 
-    - name: 🔗 Montar NFS con retry
+    - name: ❌ Eliminar Podman y herramientas relacionadas
+      raw: |
+        dnf remove -y podman podman-docker buildah || true
+        rm -rf /var/lib/containers /etc/containers || true
+
+    - name: 💪 Instalar dnf-plugins-core
+      raw: dnf install -y dnf-plugins-core
+
+    - name: ➕ Añadir repositorio oficial de Docker
+      raw: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: 🚓 Instalar Docker CE y Docker Compose Plugin
+      raw: dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    - name: ▶️ Habilitar y arrancar Docker
+      raw: systemctl enable --now docker
+
+    - name: 🔴 Crear carpeta y exportación NFS en storage1
+      delegate_to: "{{ storage_ip }}"
+      raw: |
+        mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
+        grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+        exportfs -rav
+        systemctl restart nfs-server
+
+    - name: 🔗 Montar NFS desde storage1
       shell: |
-        for i in {1..5}; do
-          mountpoint -q /mnt/traefik-token && break
-          mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token && break
-          sleep 5
-        done
+        mkdir -p /mnt/traefik-token
+        mountpoint -q /mnt/traefik-token || mount -t nfs {{ storage_ip }}:/srv/nfs/traefik-token /mnt/traefik-token
       args:
         executable: /bin/bash
+      register: mount_result
+      failed_when: mount_result.rc != 0 and 'access denied' not in mount_result.stderr
 
-    - name: 🔑 Crear service account traefik-sa en master1
+    - name: 🕒 Guardar server-ca.crt en los balanceadores
+      copy:
+        content: "{{ server_ca_cert.stdout_lines | join('\n') }}"
+        dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
+        mode: "0644"
+
+    - name: ❌ Eliminar ServiceAccount y ClusterRoleBinding previos
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
-        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
         kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
-        kubectl create sa traefik-sa -n default || true
-        kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
 
-    - name: 📥 Generar token JWT de traefik-sa
+    - name: 🛡 Crear ServiceAccount para Traefik
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: kubectl create sa traefik-sa --namespace default || true
+
+    - name: 🔐 Crear ClusterRoleBinding para traefik-sa
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
+
+    - name: ⚙️ Generar token JWT de traefik-sa en master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl -n default create token traefik-sa
       register: traefik_token
 
-    - name: 📄 Crear traefik-kubeconfig.yaml
+    - name: 🔐 Crear archivo traefik-kubeconfig.yaml
       copy:
         dest: "{{ kubeconfig_path }}"
         mode: "0600"
+        owner: root
+        group: root
         content: |
           apiVersion: v1
           kind: Config
@@ -128,39 +177,63 @@
             user:
               token: {{ traefik_token.stdout | trim }}
 
-    - name: 🛠 Renderizar traefik.toml con kubeconfig
+    - name: 🔧 Generar traefik.toml
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
 
-    - name: 🧾 Renderizar docker-compose.yml
+    - name: 🚓 Generar archivo docker-compose.yml
       template:
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
-    - name: 🧼 Eliminar acme.json si es directorio
+    - name: Eliminar acme.json si es un directorio por error
       file:
         path: "{{ traefik_config_dir }}/acme.json"
         state: absent
         force: true
 
-    - name: ➕ Crear acme.json
+    - name: Crear archivo acme.json correctamente
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
 
-    - name: 🔁 Lanzar contenedor Traefik con docker-compose
+    - name: 🤩 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
+      shell: docker rm -f traefik || true
+      args:
+        executable: /bin/bash
+
+    - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
       shell: docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
         executable: /bin/bash
 
-    - name: 📈 Mostrar estado de Traefik
+    - name: ✅ Verificar estado del contenedor Traefik
       shell: docker ps -a | grep traefik || true
       register: traefik_status
 
-    - name: 📊 Estado del contenedor Traefik
+    - name: 📊 Mostrar estado del contenedor Traefik
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
+
+    - name: 🖼 Copiar unidad systemd traefik-docker.service
+      template:
+        src: "{{ playbook_dir }}/templates/traefik/traefik-docker.service.j2"
+        dest: "/etc/systemd/system/traefik-docker.service"
+        mode: "0644"
+
+    - name: 🔁 Recargar systemd
+      command: systemctl daemon-reload
+
+    - name: ✅ Habilitar traefik-docker.service
+      systemd:
+        name: traefik-docker.service
+        enabled: true
+
+    - name: ▶️ Iniciar traefik-docker.service
+      systemd:
+        name: traefik-docker.service
+        state: started
