@@ -212,16 +212,6 @@
         group: root
         mode: '0644'
 
-
-    - name: Verificar carga de variables desde Vault
-      hosts: load_balancers
-      gather_facts: false
-
-      tasks:
-        - name: Mostrar valor de traefik_dashboard_htpasswd
-          debug:
-            var: traefik_dashboard_htpasswd
-
     - name: 🔍 DEBUG - Mostrar valor de la variable traefik_dashboard_htpasswd
       debug:
         var: traefik_dashboard_htpasswd
