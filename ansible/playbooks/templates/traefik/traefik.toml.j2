@@ -19,6 +19,7 @@
     watch = true
 
   [providers.kubernetesIngress]
+    kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"
     namespaces = ["default"]
 
 [certificatesResolvers]
@@ -39,7 +40,7 @@
 
 [http.routers]
   [http.routers.traefik]
-    rule = "Host(`traefik.local`)"
+    rule = "PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
     entryPoints = ["traefik"]
     middlewares = ["auth"]
     service = "api@internal"
