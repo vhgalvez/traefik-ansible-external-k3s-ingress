@@ -198,11 +198,13 @@
         state: absent
         force: true
 
-    - name: Crear archivo acme.json correctamente
+    - name: ✅ Crear archivo acme.json correctamente
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
+        owner: root
+        group: root
     
     - name: Renderiza dashboard.toml para habilitar el dashboard
       template:
