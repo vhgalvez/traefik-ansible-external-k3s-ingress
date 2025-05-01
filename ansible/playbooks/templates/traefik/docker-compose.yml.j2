@@ -10,10 +10,9 @@ services:
       - "443:443"       # HTTPS
       - "8080:8080"     # Traefik Dashboard (⚠️ cambiar seguridad más adelante)
     volumes:
-      - {{ traefik_config_dir }}/traefik.toml:/etc/traefik/traefik.toml:ro
-      - {{ traefik_config_dir }}/acme.json:/acme.json
-      - {{ traefik_config_dir }}/certs:/etc/traefik/certs:ro
-      - {{ kubeconfig_path }}:/etc/traefik/kubeconfig:ro
-
+      - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
+      - /etc/traefik/acme.json:/acme.json
+      - /etc/traefik/certs:/etc/traefik/certs:ro
+      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/kubeconfig:ro
     environment:
       - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
