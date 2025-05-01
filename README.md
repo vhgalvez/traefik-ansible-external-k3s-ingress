@@ -216,6 +216,11 @@ traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 https://www.md5hashgenerator.com/
 
 
+
+
+sudo apt update
+sudo apt install apache2-utils
+
 htpasswd -nb admin 123456
 
 
