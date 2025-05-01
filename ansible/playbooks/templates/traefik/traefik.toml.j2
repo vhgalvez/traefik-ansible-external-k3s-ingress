@@ -18,8 +18,9 @@
     directory = "/etc/traefik/dynamic_conf"
     watch = true
 
-  [providers.kubernetesIngress]
-    namespaces = ["default"]
+[providers.kubernetesIngress]
+  kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"
+  namespaces = ["default"]
 
 [certificatesResolvers]
   [certificatesResolvers.default.acme]
