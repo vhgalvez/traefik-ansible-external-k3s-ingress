@@ -1,18 +1,15 @@
-version: "3.9"
+[Unit]
+Description=Traefik via Docker Compose
+After=network.target docker.service
+Requires=docker.service
 
-services:
-  traefik:
-    image: traefik:v3.0
-    container_name: traefik
-    restart: unless-stopped
-    ports:
-      - "80:80"         # HTTP
-      - "443:443"       # HTTPS
-      - "8080:8080"     # Traefik Dashboard (⚠️ cambiar seguridad más adelante)
-    volumes:
-      - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
-      - /etc/traefik/acme.json:/acme.json
-      - /etc/traefik/certs:/etc/traefik/certs:ro
-      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/kubeconfig:ro
-    environment:
-      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/etc/traefik
+ExecStart=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
