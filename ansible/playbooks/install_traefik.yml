@@ -202,6 +202,14 @@
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
+    
+    - name: Renderiza dashboard.toml para habilitar el dashboard
+      template:
+        src: templates/traefik/dashboard.toml.j2
+        dest: /etc/traefik/dynamic_conf/dashboard.toml
+        owner: root
+        group: root
+        mode: '0644'
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
       shell: docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
