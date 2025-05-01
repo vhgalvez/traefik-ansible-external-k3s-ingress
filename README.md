@@ -178,19 +178,37 @@ Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la 
 
 
 
-mv group_vars/load_balancers/vault.yml group_vars/load_balancers/main.yml
 
 
-sudo ansible-vault create group_vars/load_balancers/vault.yml
+sudo ansible-vault create group_vars/load_balancers/main.yml
 
  
-sudo ansible-vault edit group_vars/load_balancers/vault.yml
+sudo ansible-vault edit group_vars/load_balancers/main.yml
 
 
-traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 
 sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml --ask-vault-pass
 
 
+
+
+sudo chown victory:victory group_vars/load_balancers/main.yml
+chmod 600 group_vars/load_balancers/main.yml
+
+
+
+sudo ansible-vault decrypt group_vars/load_balancers/main.yml
+sudo cat group_vars/load_balancers/main.yml
+sudo ansible-vault encrypt group_vars/load_balancers/main.yml
+
+
+
+
 traefik_dashboard_htpasswd: |
   admin:$apr1$K7NbnfJf$phKUBJeoyOaEFZx3AH8Mu.
+
+---
+traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
+
+
+traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
