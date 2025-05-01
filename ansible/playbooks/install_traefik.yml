@@ -34,6 +34,15 @@
         msg: "El archivo kubeconfig no se encontró en master1. Verifica la creación del archivo."
       when: kubeconfig_exists.rc != 0
 
+    # Generar el kubeconfig en master1 si no existe
+    - name: Generar kubeconfig en master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      command: |
+        # Comando para generar kubeconfig, reemplazar con el adecuado para tu entorno
+        k3s kubeconfig write --name traefik
+      when: kubeconfig_exists.rc != 0
+
     # Copiar certificado CA del API server desde master1
     - name: 📄 Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
