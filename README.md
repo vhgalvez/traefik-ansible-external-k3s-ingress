@@ -177,6 +177,10 @@ Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la 
 > Proyecto independiente para usarse como prerequisito en arquitecturas como [FlatcarMicroCloud](https://github.com/vhgalvez/FlatcarMicroCloud)
 
 
+
+mv group_vars/load_balancers/vault.yml group_vars/load_balancers/main.yml
+
+
 sudo ansible-vault create group_vars/load_balancers/vault.yml
 
  
