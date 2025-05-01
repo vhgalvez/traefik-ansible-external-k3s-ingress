@@ -1,4 +1,5 @@
 # ansible/playbooks/install_traefik.yml
+---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -12,17 +13,10 @@
     storage_ip: "10.17.4.27"
 
   tasks:
-    # Verifica si el contenedor de Traefik ya existe
-    - name: Verificar si el contenedor de Traefik existe
-      shell: docker ps -a -q --filter "name=traefik"
-      register: traefik_container
+    - name: ❌ Eliminar traefik-kubeconfig.yaml si es un directorio incorrecto
+      raw: |
+        [ -d "{{ kubeconfig_path }}" ] && rm -rf "{{ kubeconfig_path }}" || true
       changed_when: false
-      failed_when: false
-
-    # Elimina el contenedor de Traefik si existe
-    - name: Eliminar contenedor de Traefik si ya existe
-      shell: docker rm -f traefik
-      when: traefik_container.stdout != ""
       ignore_errors: true
 
     - name: 📄 Copiar certificado CA del API server desde master1
@@ -160,12 +154,15 @@
       copy:
         src: "{{ kubeconfig_path }}"
         dest: "{{ kubeconfig_path }}"
+        remote_src: true
         owner: root
         group: root
         mode: "0600"
         force: true
       become: true
       loop: "{{ groups['load_balancers'] }}"
+      loop_control:
+        loop_var: lb_host
 
     - name: 🔧 Generar traefik.toml
       template:
