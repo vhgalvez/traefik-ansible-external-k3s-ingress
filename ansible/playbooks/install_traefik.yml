@@ -34,21 +34,15 @@
         msg: "El archivo kubeconfig no se encontró en master1. Verifica la creación del archivo."
       when: kubeconfig_exists.rc != 0
 
-    # Generar el kubeconfig en master1 si no existe
-    - name: Generar kubeconfig en master1
+    - name: 🛠 Generar y modificar kubeconfig en master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      command: |
-        sudo cp /etc/rancher/k3s/k3s.yaml /etc/traefik/traefik-kubeconfig.yaml
+      shell: |
+        cp /etc/rancher/k3s/k3s.yaml {{ kubeconfig_path }}
+        sed -i 's|https://127.0.0.1:6443|https://{{ k8s_api_vip }}:6443|g' {{ kubeconfig_path }}
+      args:
+        executable: /bin/bash
       when: kubeconfig_exists.rc != 0
-
-    # Reemplazar la URL en kubeconfig para que apunte a la IP VIP
-    - name: Reemplazar la IP en kubeconfig para apuntar a la IP VIP
-      lineinfile:
-        path: "{{ kubeconfig_path }}"
-        regexp: 'server: https://127.0.0.1:6443'
-        line: "server: https://{{ k8s_api_vip }}:6443"
-      become: true
 
     # Copiar certificado CA del API server desde master1
     - name: 📄 Copiar certificado CA del API server desde master1
@@ -91,7 +85,7 @@
         flat: yes
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      become: false  # Ensure we fetch as the core user
+      become: false # Ensure we fetch as the core user
 
     # Copiar kubeconfig a cada load balancer
     - name: 📤 Copiar kubeconfig a cada load balancer
@@ -101,7 +95,7 @@
         owner: root
         group: root
         mode: "0600"
-      become: true  # Ensure root permissions on load balancer
+      become: true # Ensure root permissions on load balancer
       loop: "{{ groups['load_balancers'] }}"
       loop_control:
         loop_var: inventory_hostname
