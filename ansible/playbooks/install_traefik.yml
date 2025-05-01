@@ -105,7 +105,7 @@
     - name: ⚙️ Generar kubeconfig para Traefik (solo en master1)
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      shell: |
+      raw: |
         kubectl config set-cluster k3s-cluster \
           --server=https://{{ k8s_api_vip }}:6443 \
           --certificate-authority=/var/lib/rancher/k3s/server/tls/server-ca.crt \
