@@ -187,6 +187,25 @@
       run_once: true
       raw: chmod 0600 {{ kubeconfig_backup_path }}
 
+    - name: ❌ Eliminar traefik-kubeconfig.yaml si es un directorio incorrecto
+      raw: |
+        [ -d "{{ kubeconfig_path }}" ] && rm -rf "{{ kubeconfig_path }}" || true
+      changed_when: false
+      ignore_errors: true
+
+    - name: 📄 Copiar kubeconfig a cada load balancer
+      copy:
+        src: "/tmp/traefik-kubeconfig.yaml"
+        dest: "{{ kubeconfig_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+        force: true
+      become: true
+      loop: "{{ groups['load_balancers'] }}"
+      loop_control:
+        loop_var: inventory_hostname
+
     - name: 🔧 Generar traefik.toml
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
