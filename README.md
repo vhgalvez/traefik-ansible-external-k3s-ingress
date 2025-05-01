@@ -184,3 +184,9 @@ sudo ansible-vault edit group_vars/load_balancers/vault.yml
 
 
 traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
+
+sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml --ask-vault-pass
+
+
+traefik_dashboard_htpasswd: |
+  admin:$apr1$K7NbnfJf$phKUBJeoyOaEFZx3AH8Mu.

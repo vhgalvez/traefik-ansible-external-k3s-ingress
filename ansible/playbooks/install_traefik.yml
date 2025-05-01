@@ -212,6 +212,10 @@
         group: root
         mode: '0644'
 
+    - name: 🔍 DEBUG - Mostrar valor de la variable traefik_dashboard_htpasswd
+      debug:
+        var: traefik_dashboard_htpasswd
+
     - name: 🔐 Crear archivo users.htpasswd desde Vault
       copy:
         dest: /etc/traefik/secrets/users.htpasswd
