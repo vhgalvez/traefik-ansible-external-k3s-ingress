@@ -1,5 +1,4 @@
 # ansible\playbooks\install_traefik.yml
-# ansible\playbooks\install_traefik.yml
 ---
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
@@ -30,7 +29,7 @@
         path: "{{ traefik_config_dir }}/certs/traefik.crt"
       register: cert_stat
 
-    - name: 🔑 Verificar si existe la clave privada autofirmada
+    - name: 🔐 Verificar si existe la clave privada autofirmada
       stat:
         path: "{{ traefik_config_dir }}/certs/traefik.key"
       register: key_stat
@@ -62,7 +61,7 @@
         dnf remove -y podman podman-docker buildah || true
         rm -rf /var/lib/containers /etc/containers || true
 
-    - name: 🛠️ Instalar dnf-plugins-core
+    - name: 💪 Instalar dnf-plugins-core
       raw: dnf install -y dnf-plugins-core
 
     - name: ➕ Añadir repositorio oficial de Docker
@@ -138,13 +137,16 @@
 
         chmod 0600 {{ kubeconfig_path }}
 
-    - name: 📄 Copiar kubeconfig al storage1 (desde master1 vía SSH)
-      delegate_to: "{{ master1_ip }}"
+    - name: 📄 Copiar kubeconfig al storage1 (desde localhost usando doble scp)
       run_once: true
-      raw: |
+      shell: |
         scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
             -o StrictHostKeyChecking=no \
-            {{ kubeconfig_path }} core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
+            core@{{ master1_ip }}:{{ kubeconfig_path }} \
+            core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
 
     - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
       delegate_to: "{{ storage_ip }}"
@@ -197,7 +199,7 @@
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
 
-    - name: 🗞 Copiar unidad systemd traefik-docker.service
+    - name: 🖼 Copiar unidad systemd traefik-docker.service
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik-docker.service.j2"
         dest: "/etc/systemd/system/traefik-docker.service"
