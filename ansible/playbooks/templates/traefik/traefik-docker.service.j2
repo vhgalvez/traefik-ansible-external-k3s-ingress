@@ -1,15 +1,13 @@
 [Unit]
-Description=Traefik via Docker Compose
+Description=Traefik Ingress Controller (Docker)
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/etc/traefik
-ExecStart=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml up -d
+Restart=always
+ExecStart=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml up
 ExecStop=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml down
-TimeoutStartSec=0
+WorkingDirectory=/etc/traefik
 
 [Install]
 WantedBy=multi-user.target
