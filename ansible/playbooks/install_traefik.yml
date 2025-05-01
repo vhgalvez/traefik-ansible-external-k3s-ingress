@@ -10,10 +10,8 @@
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
     storage_ip: "10.17.4.27"
-  
 
   tasks:
-
     - name: Verificar si el contenedor de Traefik existe
       shell: docker ps -a -q --filter "name=traefik"
       register: traefik_container
@@ -205,14 +203,14 @@
         mode: "0600"
         owner: root
         group: root
-    
+
     - name: Renderiza dashboard.toml para habilitar el dashboard
       template:
         src: templates/traefik/dashboard.toml.j2
         dest: /etc/traefik/dynamic_conf/dashboard.toml
         owner: root
         group: root
-        mode: '0644'
+        mode: "0644"
 
     - name: 📁 Crear directorio para secrets de Traefik
       file:
@@ -227,7 +225,7 @@
         owner: root
         group: root
         mode: "0640"
-   
+
     - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
       shell: docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
       args:
