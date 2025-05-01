@@ -12,28 +12,23 @@
     storage_ip: "10.17.4.27"
 
   tasks:
-    
-    # Verificar si el contenedor de Traefik existe
+
     - name: Verificar si el contenedor de Traefik existe
       shell: sudo docker ps -a -q --filter "name=traefik"
       register: traefik_container
       changed_when: false
       failed_when: false
 
-    # Eliminar el contenedor de Traefik si existe
     - name: Eliminar contenedor de Traefik si ya existe
       shell: sudo docker rm -f traefik
       when: traefik_container.stdout != ""
       ignore_errors: true
 
     - name: 🧹 Eliminar /etc/traefik si existe
-      shell: |
-        if [ -d /etc/traefik ]; then
-          rm -rf /etc/traefik
-        fi
-      args:
-        executable: /bin/bash
-      ignore_errors: true
+      file:
+        path: /etc/traefik
+        state: absent
+        force: true
 
     - name: 📄 Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
@@ -42,9 +37,23 @@
       register: server_ca_cert
       changed_when: false
 
-    - name: 📁 Crear directorios para Traefik
-      raw: mkdir -p /etc/traefik /etc/traefik/certs /etc/traefik/dynamic_conf
-      changed_when: false
+    - name: 📁 Crear directorios necesarios para Traefik
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ traefik_config_dir }}"
+        - "{{ traefik_config_dir }}/certs"
+        - "{{ traefik_config_dir }}/dynamic_conf"
+
+    - name: 🚨 Eliminar archivos mal creados como directorios
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ traefik_config_dir }}/traefik.toml"
+        - "{{ traefik_config_dir }}/traefik-kubeconfig.yaml"
 
     - name: 🔒 Verificar si existe el certificado autofirmado
       stat:
@@ -74,9 +83,11 @@
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
 
-    - name: 📁 Crear directorio local para montar NFS (modo raw por compatibilidad)
-      raw: mkdir -p /mnt/traefik-token
-      changed_when: false
+    - name: 📁 Crear directorio local para montar NFS
+      file:
+        path: /mnt/traefik-token
+        state: directory
+        mode: "0755"
 
     - name: ❌ Eliminar Podman y herramientas relacionadas
       raw: |
@@ -141,7 +152,7 @@
       raw: kubectl -n default create token traefik-sa
       register: traefik_token
 
-    - name: 🔐 Crear archivo traefik-kubeconfig.yaml como plantilla estática desde Ansible
+    - name: 🔐 Crear archivo traefik-kubeconfig.yaml
       copy:
         dest: "{{ kubeconfig_path }}"
         mode: "0600"
@@ -171,16 +182,12 @@
         src: "{{ playbook_dir }}/templates/traefik/traefik.toml.j2"
         dest: "{{ traefik_config_dir }}/traefik.toml"
         mode: "0644"
-      vars:
-        vip: "{{ k8s_api_vip }}"
 
     - name: 🚓 Generar archivo docker-compose.yml
       template:
         src: "{{ playbook_dir }}/templates/traefik/docker-compose.yml.j2"
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
-      vars:
-        vip: "{{ k8s_api_vip }}"
 
     - name: Eliminar acme.json si es un directorio por error
       file:
