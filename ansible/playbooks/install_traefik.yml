@@ -113,14 +113,14 @@
       run_once: true
       raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: 📿 Generar token JWT para traefik-sa
+    - name: 📟 Generar token JWT para traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: kubectl -n default create token traefik-sa
       register: sa_token_jwt
       changed_when: false
 
-    - name: ⚙️ Generar kubeconfig para Traefik (y backup en NFS)
+    - name: ⚙️ Generar kubeconfig para Traefik (solo en master1)
       delegate_to: "{{ master1_ip }}"
       run_once: true
       raw: |
@@ -142,8 +142,21 @@
         kubectl config use-context traefik-context \
           --kubeconfig={{ kubeconfig_path }}
 
-        cp -f {{ kubeconfig_path }} {{ kubeconfig_backup_path }}
-        chmod 0600 {{ kubeconfig_path }} {{ kubeconfig_backup_path }}
+        chmod 0600 {{ kubeconfig_path }}
+
+    - name: 📄 Copiar kubeconfig al storage1 vía shell
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      shell: |
+        scp -o StrictHostKeyChecking=no {{ kubeconfig_path }} core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
+      args:
+        executable: /bin/bash
+
+    - name: 🔐 Establecer permisos del backup en storage1
+      delegate_to: "{{ storage_ip }}"
+      run_once: true
+      raw: |
+        chmod 0600 {{ kubeconfig_backup_path }}
 
     - name: 🔧 Generar traefik.toml
       template:
@@ -173,7 +186,7 @@
         content: "{}"
         mode: "0600"
 
-    - name: 🧹 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
+    - name: 🩹 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
       shell: |
         docker rm -f traefik || true
       args:
@@ -193,7 +206,7 @@
       debug:
         msg: "{{ traefik_status.stdout_lines }}"
 
-    - name: 🧾 Copiar unidad systemd traefik-docker.service
+    - name: 🗾 Copiar unidad systemd traefik-docker.service
       template:
         src: "{{ playbook_dir }}/templates/traefik/traefik-docker.service.j2"
         dest: "/etc/systemd/system/traefik-docker.service"
