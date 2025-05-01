@@ -1,9 +1,6 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
-    [entryPoints.web.http.redirections.entryPoint]
-      to = "websecure"
-      scheme = "https"
   [entryPoints.websecure]
     address = ":443"
   [entryPoints.traefik]
@@ -21,9 +18,9 @@
     directory = "/etc/traefik/dynamic_conf"
     watch = true
 
-  [providers.kubernetesIngress]
-    kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"
-    namespaces = ["default"]
+[providers.kubernetesIngress]
+  kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"
+  namespaces = ["default"]
 
 [certificatesResolvers]
   [certificatesResolvers.default.acme]
@@ -40,12 +37,10 @@
 [http.middlewares]
   [http.middlewares.auth.basicAuth]
     users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
-  [http.middlewares.ipwhitelist.ipWhiteList]
-    sourceRange = ["10.17.0.0/16", "192.168.0.0/24"]
 
 [http.routers]
   [http.routers.traefik]
     rule = "Host(`traefik.local`)"
     entryPoints = ["traefik"]
-    middlewares = ["auth", "ipwhitelist"]
+    middlewares = ["auth"]
     service = "api@internal"
