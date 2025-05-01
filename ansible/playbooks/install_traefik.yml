@@ -15,15 +15,24 @@
     
     # Verificar si el contenedor de Traefik existe
     - name: Verificar si el contenedor de Traefik existe
-      shell: docker ps -a -q --filter "name=traefik"
+      shell: sudo docker ps -a -q --filter "name=traefik"
       register: traefik_container
       changed_when: false
       failed_when: false
 
     # Eliminar el contenedor de Traefik si existe
     - name: Eliminar contenedor de Traefik si ya existe
-      shell: docker rm -f traefik
+      shell: sudo docker rm -f traefik
       when: traefik_container.stdout != ""
+      ignore_errors: true
+
+    - name: 🧹 Eliminar /etc/traefik si existe
+      shell: |
+        if [ -d /etc/traefik ]; then
+          rm -rf /etc/traefik
+        fi
+      args:
+        executable: /bin/bash
       ignore_errors: true
 
     - name: 📄 Copiar certificado CA del API server desde master1
