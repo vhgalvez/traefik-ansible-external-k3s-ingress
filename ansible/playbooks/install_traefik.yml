@@ -219,7 +219,7 @@
     - name: 🔐 Crear archivo users.htpasswd desde Vault
       copy:
         dest: /etc/traefik/secrets/users.htpasswd
-        content: "{{ traefik_dashboard_htpasswd }}"
+        content: "{{ traefik_dashboard_htpasswd | trim }}"
         owner: root
         group: root
         mode: "0640"
