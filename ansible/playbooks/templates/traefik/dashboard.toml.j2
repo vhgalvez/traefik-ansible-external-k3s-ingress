@@ -10,8 +10,13 @@
     "10.17.5.0/16"
   ]
 
+[http.middlewares.redirect-dashboard.redirectRegex]
+  regex = "^/dashboard/?(.*)"
+  replacement = "/$1"
+  permanent = true
+
 [http.routers.dashboard-host]
-  rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/dashboard`)"
+  rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/`)"
   entryPoints = ["traefik"]
   service = "api@internal"
   middlewares = ["auth", "internal-whitelist"]
@@ -20,7 +25,7 @@
   rule = "PathPrefix(`/dashboard`)"
   entryPoints = ["traefik"]
   service = "api@internal"
-  middlewares = ["auth", "internal-whitelist"]
+  middlewares = ["redirect-dashboard", "auth", "internal-whitelist"]
 
 [http.services]
   [http.services.dummy.loadBalancer]
