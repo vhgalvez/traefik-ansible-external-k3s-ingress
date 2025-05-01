@@ -10,6 +10,7 @@
     k8s_api_vip: "10.17.5.10"
     master1_ip: "10.17.4.21"
     storage_ip: "10.17.4.27"
+  
 
   tasks:
 
@@ -211,10 +212,12 @@
         group: root
         mode: '0644'
 
-    - name: Crear archivo users.htpasswd
+    - name: 🔐 Crear archivo users.htpasswd desde Vault
       copy:
         dest: /etc/traefik/secrets/users.htpasswd
         content: "{{ traefik_dashboard_htpasswd }}"
+        owner: root
+        group: root
         mode: "0640"
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig

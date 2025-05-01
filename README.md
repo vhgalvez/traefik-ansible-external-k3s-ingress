@@ -176,3 +176,11 @@ Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la 
 
 > Proyecto independiente para usarse como prerequisito en arquitecturas como [FlatcarMicroCloud](https://github.com/vhgalvez/FlatcarMicroCloud)
 
+
+sudo ansible-vault create group_vars/load_balancers/vault.yml
+
+ 
+sudo ansible-vault edit group_vars/load_balancers/vault.yml
+
+
+traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"

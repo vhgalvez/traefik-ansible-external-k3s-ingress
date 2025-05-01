@@ -1,8 +1,3 @@
-[http.routers.traefik]
-  rule = "PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
-  entryPoints = ["traefik"]
-  service = "api@internal"
-  middlewares = ["auth"]
 
 [http.middlewares.auth.basicAuth]
   usersFile = "/etc/traefik/secrets/users.htpasswd"
@@ -11,3 +6,13 @@
   [http.services.dummy.loadBalancer]
     [[http.services.dummy.loadBalancer.servers]]
       url = "http://127.0.0.1"
+
+
+[http.routers.dashboard]
+  rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/dashboard`)"
+  entryPoints = ["traefik"]
+  service = "api@internal"
+  middlewares = ["auth", "internal-whitelist"]
+
+[http.middlewares.internal-whitelist.ipWhiteList]
+  sourceRange = ["192.168.1.0/24"]
