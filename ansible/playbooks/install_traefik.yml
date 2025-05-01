@@ -39,9 +39,16 @@
       delegate_to: "{{ master1_ip }}"
       run_once: true
       command: |
-        # Comando para generar kubeconfig, reemplazar con el adecuado para tu entorno
-        k3s kubeconfig write --name traefik
+        sudo cp /etc/rancher/k3s/k3s.yaml /etc/traefik/traefik-kubeconfig.yaml
       when: kubeconfig_exists.rc != 0
+
+    # Reemplazar la URL en kubeconfig para que apunte a la IP VIP
+    - name: Reemplazar la IP en kubeconfig para apuntar a la IP VIP
+      lineinfile:
+        path: "{{ kubeconfig_path }}"
+        regexp: 'server: https://127.0.0.1:6443'
+        line: "server: https://{{ k8s_api_vip }}:6443"
+      become: true
 
     # Copiar certificado CA del API server desde master1
     - name: 📄 Copiar certificado CA del API server desde master1
