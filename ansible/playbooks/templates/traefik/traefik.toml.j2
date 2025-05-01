@@ -1,16 +1,14 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
-
   [entryPoints.websecure]
     address = ":443"
-
   [entryPoints.traefik]
     address = ":8080"
 
 [api]
   dashboard = true
-  insecure = false  # Cambiado a false para una configuración más segura
+  insecure = false
 
 [log]
   level = "DEBUG"
@@ -20,7 +18,6 @@
   watch = true
 
 [providers.kubernetesIngress]
-  kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"  # Cambié "kubeconfigFile" a "kubeconfig"
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]
