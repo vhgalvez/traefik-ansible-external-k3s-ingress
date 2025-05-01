@@ -14,13 +14,13 @@
   tasks:
 
     - name: Verificar si el contenedor de Traefik existe
-      shell: sudo docker ps -a -q --filter "name=traefik"
+      shell: docker ps -a -q --filter "name=traefik"
       register: traefik_container
       changed_when: false
       failed_when: false
 
     - name: Eliminar contenedor de Traefik si ya existe
-      shell: sudo docker rm -f traefik
+      shell: docker rm -f traefik
       when: traefik_container.stdout != ""
       ignore_errors: true
 
@@ -47,13 +47,15 @@
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
 
-    - name: 🚨 Eliminar archivos mal creados como directorios
+    - name: 🔥 Eliminar traefik.toml si es directorio
       file:
-        path: "{{ item }}"
+        path: "{{ traefik_config_dir }}/traefik.toml"
         state: absent
-      loop:
-        - "{{ traefik_config_dir }}/traefik.toml"
-        - "{{ traefik_config_dir }}/traefik-kubeconfig.yaml"
+
+    - name: 🔥 Eliminar traefik-kubeconfig.yaml si es directorio
+      file:
+        path: "{{ kubeconfig_path }}"
+        state: absent
 
     - name: 🔒 Verificar si existe el certificado autofirmado
       stat:
@@ -200,11 +202,6 @@
         dest: "{{ traefik_config_dir }}/acme.json"
         content: "{}"
         mode: "0600"
-
-    - name: 🤩 Eliminar contenedor traefik si ya existe (evitar conflicto de nombres)
-      shell: docker rm -f traefik || true
-      args:
-        executable: /bin/bash
 
     - name: ↺ Reiniciar contenedor Traefik con nuevo kubeconfig
       shell: docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
