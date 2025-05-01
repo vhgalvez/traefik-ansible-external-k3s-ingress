@@ -14,7 +14,11 @@ services:
       - {{ traefik_config_dir }}/acme.json:/acme.json
       - {{ traefik_config_dir }}/certs:/etc/traefik/certs:ro
       - {{ kubeconfig_path }}:/etc/traefik/kubeconfig:ro
-      - ./traefik.toml:/etc/traefik/traefik.toml:ro
-      - ./traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
     environment:
-      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
+      - KUBERNETES_SERVER=https://{{ vip }}:6443
+      - TRAEFIK_NAMESPACE=traefik
+      - TRAEFIK_CONFIG_DIR={{ traefik_dir }}
+      - TLS_CERT_FILE={{ traefik_dir }}/certs/traefik.local.crt
+      - TLS_KEY_FILE={{ traefik_dir }}/certs/traefik.local.key
+      - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml  # Asegúrate de que kubeconfig esté correctamente montado
+      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false  # Para evitar la verificación del TLS si es necesario
