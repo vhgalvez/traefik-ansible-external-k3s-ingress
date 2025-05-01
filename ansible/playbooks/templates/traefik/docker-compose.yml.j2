@@ -8,7 +8,7 @@ services:
     ports:
       - "80:80"         # HTTP
       - "443:443"       # HTTPS
-      - "8080:8080"     # Traefik Dashboard (asegura el acceso luego)
+      - "8080:8080"     # Dashboard
     volumes:
       - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
       - /etc/traefik/acme.json:/acme.json
@@ -17,4 +17,3 @@ services:
       - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
     environment:
       - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml
-      - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false

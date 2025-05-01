@@ -4,10 +4,11 @@ After=network.target docker.service
 Requires=docker.service
 
 [Service]
-Restart=always
+WorkingDirectory=/etc/traefik
 ExecStart=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml up
 ExecStop=/usr/bin/docker compose -f /etc/traefik/docker-compose.yml down
-WorkingDirectory=/etc/traefik
+Restart=always
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
