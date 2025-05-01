@@ -14,7 +14,7 @@
   level = "DEBUG"
 
 [providers.kubernetesIngress]
-  kubeconfig = "/etc/traefik/kubeconfig"
+  kubeconfigFile = "/etc/traefik/traefik-kubeconfig.yaml"
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]
