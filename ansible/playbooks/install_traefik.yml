@@ -146,7 +146,7 @@
             core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
       args:
         executable: /bin/bash
-      delegate_to: localhost
+      delegate_to: controller
 
     - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
       delegate_to: "{{ storage_ip }}"
