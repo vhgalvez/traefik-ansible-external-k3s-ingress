@@ -212,10 +212,16 @@
         group: root
         mode: '0644'
 
+    - name: 📁 Crear directorio para secrets de Traefik
+      file:
+        path: "{{ traefik_config_dir }}/secrets"
+        state: directory
+        mode: "0755"
+
     - name: 🔐 Copiar archivo users.htpasswd externo
       copy:
         src: files/htpasswd.txt
-        dest: /etc/traefik/secrets/users.htpasswd
+        dest: "{{ traefik_config_dir }}/secrets/users.htpasswd"
         owner: root
         group: root
         mode: "0640"
