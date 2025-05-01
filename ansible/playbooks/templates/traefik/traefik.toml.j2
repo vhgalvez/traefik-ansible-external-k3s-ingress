@@ -20,7 +20,7 @@
   watch = true
 
 [providers.kubernetesIngress]
-  kubeconfigFile = "/etc/traefik/traefik-kubeconfig.yaml"
+  kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"  # Cambié "kubeconfigFile" a "kubeconfig"
   namespaces = ["default"]
 
 [certificatesResolvers.default.acme]
