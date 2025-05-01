@@ -10,10 +10,7 @@
 
 [api]
   dashboard = true
-  insecure = false  # Cambia a false y configura autenticación segura
-  [api.auth.basic]
-    users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
-
+  insecure = false  # Cambiado a false para una configuración más segura
 
 [log]
   level = "DEBUG"
@@ -36,3 +33,14 @@
   [[tls.certificates]]
     certFile = "/etc/traefik/certs/traefik.crt"
     keyFile = "/etc/traefik/certs/traefik.key"
+
+[http.middlewares]
+  [http.middlewares.auth.basicAuth]
+    users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
+
+[http.routers]
+  [http.routers.traefik]
+    rule = "Host(`traefik.local`)"
+    entryPoints = ["traefik"]
+    middlewares = ["auth"]
+    service = "api@internal"
