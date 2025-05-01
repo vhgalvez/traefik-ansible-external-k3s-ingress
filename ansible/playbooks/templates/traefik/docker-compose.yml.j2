@@ -14,7 +14,7 @@ services:
       - /etc/traefik/acme.json:/acme.json
       - /etc/traefik/certs:/etc/traefik/certs:ro
       - /etc/traefik/dynamic_conf:/etc/traefik/dynamic_conf:ro
-      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
       - /etc/traefik/secrets:/etc/traefik/secrets:ro
+      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
     environment:
       - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml
