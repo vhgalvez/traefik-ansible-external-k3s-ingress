@@ -15,14 +15,8 @@
   replacement = "/$1"
   permanent = true
 
-[http.routers.dashboard-host]
-  rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/`)"
-  entryPoints = ["traefik"]
-  service = "api@internal"
-  middlewares = ["auth", "internal-whitelist"]
-
-[http.routers.dashboard-ip]
-  rule = "PathPrefix(`/dashboard`)"
+[http.routers.dashboard]
+  rule = "PathPrefix(`/`)"
   entryPoints = ["traefik"]
   service = "api@internal"
   middlewares = ["redirect-dashboard", "auth", "internal-whitelist"]
