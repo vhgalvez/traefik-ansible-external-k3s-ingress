@@ -70,7 +70,7 @@
             core@{{ master1_ip }}:{{ kubeconfig_path }} ${TMP_KUBECONFIG}
 
         echo "📄 Subiendo kubeconfig a load balancer..."
-        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
+        sudo scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
             -o StrictHostKeyChecking=no \
             ${TMP_KUBECONFIG} core@{{ inventory_hostname }}:{{ kubeconfig_path }}
 
