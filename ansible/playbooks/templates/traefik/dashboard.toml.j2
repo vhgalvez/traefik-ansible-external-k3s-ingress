@@ -1,12 +1,14 @@
-
 [http.middlewares.auth.basicAuth]
   usersFile = "/etc/traefik/secrets/users.htpasswd"
 
-[http.services]
-  [http.services.dummy.loadBalancer]
-    [[http.services.dummy.loadBalancer.servers]]
-      url = "http://127.0.0.1"
-
+[http.middlewares.internal-whitelist.ipWhiteList]
+  sourceRange = [
+    "192.168.1.0/24",
+    "10.17.0.0/16",
+    "10.17.3.0/16",
+    "10.17.4.0/16",
+    "10.17.5.0/16"
+  ]
 
 [http.routers.dashboard]
   rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/dashboard`)"
@@ -14,5 +16,7 @@
   service = "api@internal"
   middlewares = ["auth", "internal-whitelist"]
 
-[http.middlewares.internal-whitelist.ipWhiteList]
-  sourceRange = ["192.168.1.0/24"]
+[http.services]
+  [http.services.dummy.loadBalancer]
+    [[http.services.dummy.loadBalancer.servers]]
+      url = "http://127.0.0.1"
