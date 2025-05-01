@@ -5,7 +5,7 @@
   middlewares = ["auth"]
 
 [http.middlewares.auth.basicAuth]
-  users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]  # Usuario admin con contraseña encriptada
+  usersFile = "/etc/traefik/secrets/users.htpasswd"
 
 [http.services]
   [http.services.dummy.loadBalancer]

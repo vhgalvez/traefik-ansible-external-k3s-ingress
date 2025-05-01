@@ -15,5 +15,6 @@ services:
       - /etc/traefik/certs:/etc/traefik/certs:ro
       - /etc/traefik/dynamic_conf:/etc/traefik/dynamic_conf:ro
       - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
+      - /etc/traefik/secrets:/etc/traefik/secrets:ro
     environment:
       - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml
