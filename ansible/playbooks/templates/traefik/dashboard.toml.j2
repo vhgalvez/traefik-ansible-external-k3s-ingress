@@ -10,8 +10,14 @@
     "10.17.5.0/16"
   ]
 
-[http.routers.dashboard]
+[http.routers.dashboard-host]
   rule = "Host(`traefik.interna.tuempresa.com`) && PathPrefix(`/dashboard`)"
+  entryPoints = ["traefik"]
+  service = "api@internal"
+  middlewares = ["auth", "internal-whitelist"]
+
+[http.routers.dashboard-ip]
+  rule = "PathPrefix(`/dashboard`)"
   entryPoints = ["traefik"]
   service = "api@internal"
   middlewares = ["auth", "internal-whitelist"]
