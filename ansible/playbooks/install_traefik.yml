@@ -139,7 +139,7 @@
         chmod 0600 {{ kubeconfig_path }}
 
     - name: 📄 Copiar kubeconfig al storage1 (vía SSH desde localhost)
-      delegate_to: localhost
+      delegate_to: "master1_ip"
       run_once: true
       shell: |
         scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
