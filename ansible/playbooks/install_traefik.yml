@@ -1,5 +1,5 @@
 # ansible/playbooks/install_traefik.yml
----
+--- 
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -25,7 +25,7 @@
     - name: 🔍 Verificar si kubeconfig existe en master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      command: test -f /etc/traefik/traefik-kubeconfig.yaml
+      raw: test -f /etc/traefik/traefik-kubeconfig.yaml
       register: kubeconfig_exists
       ignore_errors: true
 
