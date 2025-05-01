@@ -9,10 +9,10 @@
 [api]
   dashboard = true
   insecure = false  # Cambia a false y configura autenticación segura
-  [api.auth.basic]
-    users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]  # Reemplaza esto con tu usuario y contraseña cifrada
+  [api.security]
+    [api.security.basicAuth]
+      users = ["admin:$apr1$Mv60e4y9$hzGGgjKKRz5yV6L.PTtji."]
 
-[log]
   level = "DEBUG"
 
 [providers.kubernetesIngress]

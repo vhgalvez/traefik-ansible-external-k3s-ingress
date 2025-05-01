@@ -4,13 +4,9 @@ Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 
-# (Opcional si montas token por NFS con systemd)
-# Requires=mnt-traefik-token.mount
-# After=mnt-traefik-token.mount
-
 [Service]
-Type=oneshot
-RemainAfterExit=true
+Type=simple  # Usar simple para mantener el servicio activo
+RemainAfterExit=false
 ExecStartPre=/bin/bash -c '[ -f {{ kubeconfig_path }} ]'
 WorkingDirectory={{ traefik_config_dir }}
 ExecStart=/usr/bin/docker compose -f {{ traefik_config_dir }}/docker-compose.yml up -d
