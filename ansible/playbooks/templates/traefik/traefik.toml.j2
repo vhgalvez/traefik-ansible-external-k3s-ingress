@@ -13,18 +13,21 @@
 [log]
   level = "DEBUG"
 
-[providers.file]
-  directory = "/etc/traefik/dynamic_conf"
-  watch = true
+[providers]
+  [providers.file]
+    directory = "/etc/traefik/dynamic_conf"
+    watch = true
 
-[providers.kubernetesIngress]
-  namespaces = ["default"]
+  [providers.kubernetesIngress]
+    kubeconfig = "/etc/traefik/traefik-kubeconfig.yaml"
+    namespaces = ["default"]
 
-[certificatesResolvers.default.acme]
-  email = "{{ letsencrypt_email | default('admin@example.com') }}"
-  storage = "/acme.json"
-  [certificatesResolvers.default.acme.httpChallenge]
-    entryPoint = "web"
+[certificatesResolvers]
+  [certificatesResolvers.default.acme]
+    email = "admin@example.com"
+    storage = "/acme.json"
+    [certificatesResolvers.default.acme.httpChallenge]
+      entryPoint = "web"
 
 [tls]
   [[tls.certificates]]

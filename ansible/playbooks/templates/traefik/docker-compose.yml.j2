@@ -8,11 +8,13 @@ services:
     ports:
       - "80:80"         # HTTP
       - "443:443"       # HTTPS
-      - "8080:8080"     # Traefik Dashboard (⚠️ cambiar seguridad más adelante)
+      - "8080:8080"     # Traefik Dashboard (asegura el acceso luego)
     volumes:
       - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
       - /etc/traefik/acme.json:/acme.json
       - /etc/traefik/certs:/etc/traefik/certs:ro
-      - /etc/traefik/traefik-kubeconfig.yaml:/var/run/secrets/kubernetes.io/serviceaccount/token:ro
+      - /etc/traefik/dynamic_conf:/etc/traefik/dynamic_conf:ro
+      - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
     environment:
+      - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml
       - KUBERNETES_INSECURE_SKIP_TLS_VERIFY=false
