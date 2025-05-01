@@ -113,89 +113,46 @@
       run_once: true
       raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
 
-    - name: ⚙️ Generar kubeconfig para Traefik (solo en master1)
+    - name: ⚙️ Generar token JWT de traefik-sa en master1
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      raw: |
-        kubectl config set-cluster k3s-cluster \
-          --server=https://{{ k8s_api_vip }}:6443 \
-          --certificate-authority=/var/lib/rancher/k3s/server/tls/server-ca.crt \
-          --embed-certs=true \
-          --kubeconfig={{ kubeconfig_path }}
+      raw: kubectl -n default create token traefik-sa
+      register: traefik_token
 
-        kubectl config set-credentials traefik-sa \
-          --token=$(kubectl -n default create token traefik-sa) \
-          --kubeconfig={{ kubeconfig_path }}
-
-        kubectl config set-context traefik-context \
-          --cluster=k3s-cluster \
-          --user=traefik-sa \
-          --kubeconfig={{ kubeconfig_path }}
-
-        kubectl config use-context traefik-context \
-          --kubeconfig={{ kubeconfig_path }}
-
-        chmod 0600 {{ kubeconfig_path }}
-
-    - name: 👤 Cambiar propietario del kubeconfig para permitir lectura por 'core'
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: chown core:core {{ kubeconfig_path }}
-
-    - name: 🔓 Permitir lectura temporal del kubeconfig
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: chmod 0644 {{ kubeconfig_path }}
-
-    - name: 🗓️ Copiar kubeconfig al storage1 (desde localhost usando doble scp robusto)
-      run_once: true
-      delegate_to: localhost
-      shell: |
-        set -e
-        TMP_KUBECONFIG="/tmp/traefik-kubeconfig.yaml"
-
-        echo "🗓️ Descargando kubeconfig desde master1..."
-        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
-            -o StrictHostKeyChecking=no \
-            core@{{ master1_ip }}:{{ kubeconfig_path }} ${TMP_KUBECONFIG}
-
-        echo "📄 Subiendo kubeconfig a storage1..."
-        scp -i /root/.ssh/cluster_k3s/shared/id_rsa_shared_cluster \
-            -o StrictHostKeyChecking=no \
-            ${TMP_KUBECONFIG} core@{{ storage_ip }}:{{ kubeconfig_backup_path }}
-
-        echo "🪟 Limpiando archivo temporal..."
-        rm -f ${TMP_KUBECONFIG}
-      args:
-        executable: /bin/bash
-
-    - name: ✅ Verificar que kubeconfig se copio correctamente en storage1 (modo raw para Flatcar)
-      run_once: true
-      delegate_to: "{{ storage_ip }}"
-      raw: test -f {{ kubeconfig_backup_path }}
-      register: kubeconfig_check
-      ignore_errors: true
-
-    - name: ❌ Abortamos si kubeconfig no se copio a storage1
-      run_once: true
-      fail:
-        msg: "El archivo kubeconfig no se encontró en {{ kubeconfig_backup_path }}. Revisa el paso de doble scp."
-      when: kubeconfig_check.rc != 0
-
-    - name: 🔐 Establecer permisos del backup en storage1 (modo raw)
-      delegate_to: "{{ storage_ip }}"
-      run_once: true
-      raw: chmod 0600 {{ kubeconfig_backup_path }}
+    - name: 🔐 Crear archivo traefik-kubeconfig.yaml como plantilla estática desde Ansible
+      copy:
+        dest: "{{ kubeconfig_path }}"
+        mode: "0600"
+        owner: root
+        group: root
+        content: |
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - name: default
+            cluster:
+              server: https://{{ k8s_api_vip }}:6443
+              insecure-skip-tls-verify: true
+          contexts:
+          - name: default
+            context:
+              cluster: default
+              user: remote-access
+          current-context: default
+          users:
+          - name: remote-access
+            user:
+              token: {{ traefik_token.stdout | trim }}
 
     - name: ❌ Eliminar traefik-kubeconfig.yaml si es un directorio incorrecto
       raw: |
-        [ -d "{{ kubeconfig_path }}" ] && rm -rf "{{ kubeconfig_path }}" || true
+        [ -d "{{ kubeconfig_path }}" ] && rm -rf "{{ kubeconfig_path }}"
       changed_when: false
       ignore_errors: true
 
-    - name: 📄 Copiar kubeconfig a cada load balancer
+    - name: 📤 Copiar traefik-kubeconfig.yaml a todos los load balancer
       copy:
-        src: "/tmp/traefik-kubeconfig.yaml"
+        src: "{{ kubeconfig_path }}"
         dest: "{{ kubeconfig_path }}"
         owner: root
         group: root
