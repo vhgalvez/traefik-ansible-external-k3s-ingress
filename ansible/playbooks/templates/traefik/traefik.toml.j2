@@ -18,8 +18,8 @@
     directory = "/etc/traefik/dynamic_conf"
     watch = true
 
-  [providers.kubernetesIngress]
-    namespaces = ["default"]
+[providers.kubernetesIngress]
+  ingressClass = "traefik"  # Solo los Ingress explícitos serán manejados
 
 [certificatesResolvers]
   [certificatesResolvers.default.acme]
