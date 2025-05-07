@@ -1,3 +1,4 @@
+# ansible\playbooks\reset_traefik_env.yml
 ---
 - name: 🔁 Reset completo del entorno Traefik (token, NFS, contenedor)
   hosts: load_balancers
@@ -10,7 +11,6 @@
     storage_ip: "10.17.4.27"
 
   tasks:
-
     - name: ❌ Desmontar NFS si está montado
       shell: |
         mountpoint -q /mnt/traefik-token && umount -f /mnt/traefik-token || true
@@ -31,21 +31,16 @@
       delegate_to: "{{ storage_ip }}"
       raw: rm -f {{ nfs_backup_token_path }}
 
-
     - name: 🧹 Eliminar configuración traefik local si deseas (opcional)
       file:
         path: "{{ traefik_config_dir }}"
         state: absent
       when: traefik_config_dir is defined and traefik_config_dir != ""
 
-      # ansible/playbooks/handlers/main.yml
-- name: 🔄 Reiniciar traefik-docker y recargar systemd
-  become: true
-  block:
-    - name: Recargar systemd
+    - name: 🔄 Recargar systemd
       command: systemctl daemon-reload
 
-    - name: Reiniciar servicio traefik-docker
+    - name: 🔄 Reiniciar servicio traefik-docker
       systemd:
         name: traefik-docker
         state: restarted
