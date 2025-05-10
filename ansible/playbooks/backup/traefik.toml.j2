@@ -32,15 +32,3 @@
   [[tls.certificates]]
     certFile = "/etc/traefik/certs/traefik.crt"
     keyFile = "/etc/traefik/certs/traefik.key"
-
-[http.routers]
-  [http.routers.http-to-https]
-  entryPoints = ["web"]
-  rule = "Host(`jenkins.local`) || Host(`argocd.local`) || Host(`grafana.local`) || Host(`prometheus.local`)"
-  middlewares = ["https-redirect"]
-
-[http.middlewares]
-  # Middleware de redirección HTTP -> HTTPS
-  [http.middlewares.https-redirect.redirectScheme]
-    scheme = "https"
-    permanent = true
