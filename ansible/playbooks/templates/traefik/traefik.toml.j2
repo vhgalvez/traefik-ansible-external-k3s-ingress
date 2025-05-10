@@ -18,15 +18,15 @@
     directory = "/etc/traefik/dynamic_conf"
     watch = true
 
-[providers.kubernetesIngress]
-  ingressClass = "traefik"  # Solo los Ingress explícitos serán manejados
+  [providers.kubernetesIngress]
+    ingressClass = "traefik"  # Solo los Ingress explícitos serán manejados
 
 [certificatesResolvers]
   [certificatesResolvers.default.acme]
     email = "admin@example.com"
     storage = "/acme.json"
     [certificatesResolvers.default.acme.httpChallenge]
-      entryPoint = "web"
+      entryPoint = "web"  # Usar HTTP challenge para obtener el certificado TLS
 
 [tls]
   [[tls.certificates]]
@@ -35,9 +35,9 @@
 
 [http.routers]
   [http.routers.http-to-https]
-  entryPoints = ["web"]
-  rule = "Host(`jenkins.local`) || Host(`argocd.local`) || Host(`grafana.local`) || Host(`prometheus.local`)"
-  middlewares = ["https-redirect"]
+    entryPoints = ["web"]
+    rule = "Host(`jenkins.local`) || Host(`argocd.local`) || Host(`grafana.local`) || Host(`prometheus.local`)"
+    middlewares = ["https-redirect"]
 
 [http.middlewares]
   # Middleware de redirección HTTP -> HTTPS
