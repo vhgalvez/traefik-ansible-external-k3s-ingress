@@ -234,3 +234,9 @@ htpasswd -nb admin 123456
 
 
 admin:$apr1$EmwxsRBo$wxwfDVIUfvrM.LFk4AWsr1
+
+
+
+~/.kube/config: /home/core/.kube/config
+/etc/rancher/k3s/k3s.yaml
+/var/lib/rancher/k3s/server/tls/client-admin.crt
