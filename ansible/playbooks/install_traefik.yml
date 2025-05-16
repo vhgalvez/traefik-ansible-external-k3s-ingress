@@ -29,13 +29,6 @@
         state: absent
         force: true
 
-    - name: 📄 Copiar certificado CA del API server desde master1
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
-      register: server_ca_cert
-      changed_when: false
-
     - name: 📁 Crear directorios necesarios para Traefik
       file:
         path: "{{ item }}"
@@ -45,16 +38,36 @@
         - "{{ traefik_config_dir }}"
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
+        - "{{ traefik_config_dir }}/secrets"
 
-    - name: 🔥 Eliminar traefik.toml si es directorio
+    - name: 🧨 Verificar si traefik.toml es directorio
+      stat:
+        path: "{{ traefik_config_dir }}/traefik.toml"
+      register: traefik_toml_stat
+
+    - name: 🧹 Eliminar traefik.toml si es directorio
       file:
         path: "{{ traefik_config_dir }}/traefik.toml"
         state: absent
+      when: traefik_toml_stat.stat.isdir is defined and traefik_toml_stat.stat.isdir
 
-    - name: 🔥 Eliminar traefik-kubeconfig.yaml si es directorio
+    - name: 🧨 Verificar si traefik-kubeconfig.yaml es directorio
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: 🧹 Eliminar traefik-kubeconfig.yaml si es directorio
       file:
         path: "{{ kubeconfig_path }}"
         state: absent
+      when: kubeconfig_stat.stat.isdir is defined and kubeconfig_stat.stat.isdir
+
+    - name: 📄 Copiar certificado CA del API server desde master1
+      delegate_to: "{{ master1_ip }}"
+      run_once: true
+      raw: cat /var/lib/rancher/k3s/server/tls/server-ca.crt
+      register: server_ca_cert
+      changed_when: false
 
     - name: 🔒 Verificar si existe el certificado autofirmado
       stat:
@@ -83,12 +96,6 @@
       loop:
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
-
-    - name: 📁 Crear directorio local para montar NFS
-      file:
-        path: /mnt/traefik-token
-        state: directory
-        mode: "0755"
 
     - name: ❌ Eliminar Podman y herramientas relacionadas
       raw: |
@@ -130,29 +137,6 @@
         dest: "{{ traefik_config_dir }}/certs/server-ca.crt"
         mode: "0644"
 
-    - name: ❌ Eliminar ServiceAccount y ClusterRoleBinding previos
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: |
-        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
-        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
-
-    - name: 🛡 Crear ServiceAccount para Traefik
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: kubectl create sa traefik-sa --namespace default || true
-
-    - name: 🔐 Crear ClusterRoleBinding para traefik-sa
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa
-
-    - name: ⚙️ Generar token JWT de traefik-sa en master1
-      delegate_to: "{{ master1_ip }}"
-      run_once: true
-      raw: kubectl -n default create token traefik-sa
-      register: traefik_token
-
     - name: 🔐 Crear archivo traefik-kubeconfig.yaml
       copy:
         dest: "{{ kubeconfig_path }}"
@@ -190,12 +174,6 @@
         dest: "{{ traefik_config_dir }}/docker-compose.yml"
         mode: "0644"
 
-    - name: Eliminar acme.json si es un directorio por error
-      file:
-        path: "{{ traefik_config_dir }}/acme.json"
-        state: absent
-        force: true
-
     - name: ✅ Crear archivo acme.json correctamente
       copy:
         dest: "{{ traefik_config_dir }}/acme.json"
@@ -212,15 +190,9 @@
         group: root
         mode: "0644"
 
-    - name: 📁 Crear directorio para secrets de Traefik
-      file:
-        path: "{{ traefik_config_dir }}/secrets"
-        state: directory
-        mode: "0755"
-
     - name: 🔐 Copiar archivo users.htpasswd externo
       copy:
-        src: files/htpasswd.txt
+        src: "{{ playbook_dir }}/files/htpasswd.txt"
         dest: "{{ traefik_config_dir }}/secrets/users.htpasswd"
         owner: root
         group: root
