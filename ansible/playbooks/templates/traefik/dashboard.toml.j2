@@ -22,8 +22,3 @@
   entryPoints = ["traefik"]
   service = "api@internal"
   middlewares = ["redirect-dashboard", "auth", "internal-whitelist"]
-
-[http.services]
-  [http.services.dummy.loadBalancer]
-    [[http.services.dummy.loadBalancer.servers]]
-      url = "http://127.0.0.1"
