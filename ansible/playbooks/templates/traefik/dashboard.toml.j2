@@ -1,3 +1,4 @@
+# ansible\playbooks\templates\traefik\dashboard.toml.j2
 [http.middlewares.auth.basicAuth]
   usersFile = "/etc/traefik/secrets/users.htpasswd"
 
@@ -17,7 +18,7 @@
   permanent = true
 
 [http.routers.dashboard]
-  rule = "PathPrefix(`/`)"
+  rule = "PathPrefix(`/dashboard`)"
   entryPoints = ["traefik"]
   service = "api@internal"
   middlewares = ["redirect-dashboard", "auth", "internal-whitelist"]

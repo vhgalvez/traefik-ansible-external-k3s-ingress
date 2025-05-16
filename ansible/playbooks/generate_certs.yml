@@ -1,0 +1,71 @@
+# ansible\playbooks\generate_certs.yml
+---
+- name: 🛡️ Generar certificados wildcard autofirmados para Traefik
+  hosts: load_balancers
+  become: true
+
+  vars:
+    certs_dir: "/etc/traefik/certs"
+    cert_name: "traefik"
+    country: "ES"
+    state: "Madrid"
+    locality: "Madrid"
+    organization: "FlatcarMicroCloud"
+    common_name: "*.cefaslocalserver.com"
+    san_file: "/tmp/san.cnf"
+
+  tasks:
+    - name: 📁 Crear directorio de certificados
+      file:
+        path: "{{ certs_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: 📝 Crear archivo SAN (Subject Alternative Name)
+      copy:
+        dest: "{{ san_file }}"
+        content: |
+          [req]
+          default_bits       = 4096
+          prompt             = no
+          default_md         = sha256
+          req_extensions     = req_ext
+          distinguished_name = dn
+
+          [dn]
+          C={{ country }}
+          ST={{ state }}
+          L={{ locality }}
+          O={{ organization }}
+          CN={{ common_name }}
+
+          [req_ext]
+          subjectAltName = @alt_names
+
+          [alt_names]
+          DNS.1 = *.cefaslocalserver.com
+          DNS.2 = cefaslocalserver.com
+          DNS.3 = jenkins.cefaslocalserver.com
+          DNS.4 = grafana.cefaslocalserver.com
+          DNS.5 = argocd.cefaslocalserver.com
+          DNS.6 = prometheus.cefaslocalserver.com
+
+    - name: 🔐 Generar clave privada
+      command: openssl genrsa -out {{ certs_dir }}/{{ cert_name }}.key 4096
+      args:
+        creates: "{{ certs_dir }}/{{ cert_name }}.key"
+
+    - name: 📜 Generar certificado wildcard autofirmado
+      command: >
+        openssl req -x509 -nodes -days 3650
+        -key {{ certs_dir }}/{{ cert_name }}.key
+        -out {{ certs_dir }}/{{ cert_name }}.crt
+        -config {{ san_file }}
+        -extensions req_ext
+      args:
+        creates: "{{ certs_dir }}/{{ cert_name }}.crt"
+
+    - name: 🧹 Eliminar archivo temporal SAN
+      file:
+        path: "{{ san_file }}"
+        state: absent
