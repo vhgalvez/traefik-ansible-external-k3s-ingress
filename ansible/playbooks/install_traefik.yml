@@ -12,25 +12,23 @@
     storage_ip: "10.17.4.27"
 
   pre_tasks:
-    - name: 🔐 Crear ServiceAccount y obtener token JWT
+    - name: 🔐 Crear ServiceAccount y ClusterRoleBinding para Traefik (sin Python)
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      shell: |
+      raw: |
         kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
         kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
         kubectl create sa traefik-sa -n default || true
         kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa || true
-        kubectl -n default create token traefik-sa > /tmp/traefik.token
-      args:
-        executable: /bin/bash
 
-    - name: 📥 Leer token JWT desde archivo temporal
+    - name: 🔑 Obtener token JWT de traefik-sa
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      shell: cat /tmp/traefik.token
+      raw: kubectl -n default create token traefik-sa
       register: traefik_token_result
+      changed_when: false
 
-    - name: Set fact traefik_token
+    - name: 🧠 Guardar traefik_token como variable
       set_fact:
         traefik_token: "{{ traefik_token_result.stdout | trim }}"
 
