@@ -1,4 +1,5 @@
 # ansible/playbooks/install_traefik.yml
+# ansible/playbooks/install_traefik.yml
 - name: Instalar y Configurar Traefik como Ingress Controller usando Docker
   hosts: load_balancers
   become: true
@@ -12,24 +13,21 @@
     storage_ip: "10.17.4.27"
 
   pre_tasks:
-    - name: 🛡 Crear ServiceAccount y ClusterRoleBinding en master1 para generar token
+    - name: 🔐 Crear ServiceAccount y obtener token JWT
       delegate_to: "{{ master1_ip }}"
       run_once: true
-      block:
-        - name: 🧹 Eliminar recursos anteriores
-          shell: |
-            kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
-            kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
+      shell: |
+        kubectl delete clusterrolebinding traefik-sa-crb --ignore-not-found=true || true
+        kubectl delete sa traefik-sa -n default --ignore-not-found=true || true
+        kubectl create sa traefik-sa -n default || true
+        kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa || true
+        kubectl -n default create token traefik-sa
+      register: traefik_token_result
+      changed_when: false
 
-        - name: 🛡 Crear nuevo ServiceAccount
-          shell: kubectl create sa traefik-sa -n default || true
-
-        - name: 🛡 Asignar rol cluster-admin
-          shell: kubectl create clusterrolebinding traefik-sa-crb --clusterrole=cluster-admin --serviceaccount=default:traefik-sa || true
-
-        - name: 🔐 Obtener token JWT para traefik-sa
-          shell: kubectl -n default create token traefik-sa
-          register: traefik_token
+    - name: Set fact traefik_token
+      set_fact:
+        traefik_token: "{{ traefik_token_result.stdout | trim }}"
 
   tasks:
     - name: Verificar si el contenedor de Traefik existe
@@ -59,6 +57,28 @@
         - "{{ traefik_config_dir }}/certs"
         - "{{ traefik_config_dir }}/dynamic_conf"
         - "{{ traefik_config_dir }}/secrets"
+
+    - name: 🧨 Verificar si traefik.toml es directorio
+      stat:
+        path: "{{ traefik_config_dir }}/traefik.toml"
+      register: traefik_toml_stat
+
+    - name: 🧹 Eliminar traefik.toml si es directorio
+      file:
+        path: "{{ traefik_config_dir }}/traefik.toml"
+        state: absent
+      when: traefik_toml_stat.stat.isdir is defined and traefik_toml_stat.stat.isdir
+
+    - name: 🧨 Verificar si traefik-kubeconfig.yaml es directorio
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: 🧹 Eliminar traefik-kubeconfig.yaml si es directorio
+      file:
+        path: "{{ kubeconfig_path }}"
+        state: absent
+      when: kubeconfig_stat.stat.isdir is defined and kubeconfig_stat.stat.isdir
 
     - name: 📄 Copiar certificado CA del API server desde master1
       delegate_to: "{{ master1_ip }}"
@@ -94,6 +114,31 @@
       loop:
         - { path: "{{ traefik_config_dir }}/certs/traefik.crt", mode: "0644" }
         - { path: "{{ traefik_config_dir }}/certs/traefik.key", mode: "0600" }
+
+    - name: ❌ Eliminar Podman y herramientas relacionadas
+      raw: |
+        dnf remove -y podman podman-docker buildah || true
+        rm -rf /var/lib/containers /etc/containers || true
+
+    - name: 💪 Instalar dnf-plugins-core
+      raw: dnf install -y dnf-plugins-core
+
+    - name: ➕ Añadir repositorio oficial de Docker
+      raw: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: 🚓 Instalar Docker CE y Docker Compose Plugin
+      raw: dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    - name: ▶️ Habilitar y arrancar Docker
+      raw: systemctl enable --now docker
+
+    - name: 🔴 Crear carpeta y exportación NFS en storage1
+      delegate_to: "{{ storage_ip }}"
+      raw: |
+        mkdir -p /srv/nfs/traefik-token && chmod 0777 /srv/nfs/traefik-token
+        grep -q "/srv/nfs/traefik-token" /etc/exports || echo "/srv/nfs/traefik-token 10.17.3.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+        exportfs -rav
+        systemctl restart nfs-server
 
     - name: 🔗 Montar NFS desde storage1
       shell: |
@@ -133,7 +178,7 @@
           users:
           - name: remote-access
             user:
-              token: {{ traefik_token.stdout | trim }}
+              token: {{ traefik_token }}
 
     - name: 🔧 Generar traefik.toml
       template:
