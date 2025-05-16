@@ -13,6 +13,7 @@
     organization: "FlatcarMicroCloud"
     common_name: "*.cefaslocalserver.com"
     san_file: "/tmp/san.cnf"
+    force_recreate: false # Cambia a true para forzar regeneración
 
   tasks:
     - name: 📁 Crear directorio de certificados
@@ -20,6 +21,16 @@
         path: "{{ certs_dir }}"
         state: directory
         mode: "0755"
+
+    - name: 📋 Verificar si ya existe el certificado
+      stat:
+        path: "{{ certs_dir }}/{{ cert_name }}.crt"
+      register: cert_stat
+
+    - name: 📋 Verificar si ya existe la clave privada
+      stat:
+        path: "{{ certs_dir }}/{{ cert_name }}.key"
+      register: key_stat
 
     - name: 📝 Crear archivo SAN (Subject Alternative Name)
       copy:
@@ -52,8 +63,7 @@
 
     - name: 🔐 Generar clave privada
       command: openssl genrsa -out {{ certs_dir }}/{{ cert_name }}.key 4096
-      args:
-        creates: "{{ certs_dir }}/{{ cert_name }}.key"
+      when: force_recreate or not key_stat.stat.exists
 
     - name: 📜 Generar certificado wildcard autofirmado
       command: >
@@ -62,8 +72,15 @@
         -out {{ certs_dir }}/{{ cert_name }}.crt
         -config {{ san_file }}
         -extensions req_ext
-      args:
-        creates: "{{ certs_dir }}/{{ cert_name }}.crt"
+      when: force_recreate or not cert_stat.stat.exists
+
+    - name: 🔐 Establecer permisos seguros
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ certs_dir }}/{{ cert_name }}.crt", mode: "0644" }
+        - { path: "{{ certs_dir }}/{{ cert_name }}.key", mode: "0600" }
 
     - name: 🧹 Eliminar archivo temporal SAN
       file:
