@@ -1,4 +1,4 @@
-# ansible\playbooks\reset_traefik_env.yml
+# ansible\playbooks\uninstall_traefik.yml
 ---
 - name: 🔁 Reset completo del entorno Traefik (token, NFS, contenedor)
   hosts: load_balancers
@@ -37,11 +37,21 @@
         state: absent
       when: traefik_config_dir is defined and traefik_config_dir != ""
 
+    - name: 🔄 Eliminar archivo docker-compose.yml si existe
+      file:
+        path: "{{ traefik_config_dir }}/docker-compose.yml"
+        state: absent
+
+    - name: 🔄 Eliminar unidad systemd de traefik si existe
+      file:
+        path: "/etc/systemd/system/traefik-docker.service"
+        state: absent
+
     - name: 🔄 Recargar systemd
       command: systemctl daemon-reload
 
-    - name: 🔄 Reiniciar servicio traefik-docker
+    - name: 🔄 Detener y deshabilitar servicio traefik-docker si estaba activo
       systemd:
         name: traefik-docker
-        state: restarted
-        enabled: true
+        state: stopped
+        enabled: false
