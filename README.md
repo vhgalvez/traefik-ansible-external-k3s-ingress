@@ -52,7 +52,7 @@ Antes de usar este repositorio, asegúrate de cumplir con los siguientes requisi
    Usa el siguiente comando para instalar y configurar Traefik:
 
    ```bash
-   sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml
+   sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install.yml
    ```
 
 

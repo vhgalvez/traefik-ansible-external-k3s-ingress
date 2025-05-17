@@ -4,11 +4,9 @@ services:
   traefik:
     image: traefik:v3.3
     container_name: traefik
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+
     volumes:
       - /etc/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
       - /etc/traefik/acme.json:/acme.json
@@ -16,5 +14,6 @@ services:
       - /etc/traefik/dynamic_conf:/etc/traefik/dynamic_conf:ro
       - /etc/traefik/secrets:/etc/traefik/secrets:ro
       - /etc/traefik/traefik-kubeconfig.yaml:/etc/traefik/traefik-kubeconfig.yaml:ro
+
     environment:
       - KUBECONFIG=/etc/traefik/traefik-kubeconfig.yaml
