@@ -1,4 +1,3 @@
-
 # Traefik Kubernetes Ingress Controller con Ansible
 
 Este repositorio contiene configuraciones y scripts para implementar y gestionar un balanceador de carga eficiente basado en **Traefik** utilizando **Docker Compose** dentro de un entorno Kubernetes. El objetivo principal es facilitar la instalación y configuración de **Traefik** como proxy inverso y balanceador de carga en un nodo dedicado (`loadbalancer1`), optimizado para gestionar nodos maestros, trabajadores y otros servicios de red.
@@ -95,6 +94,7 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
 ```plaintext
 10.17.3.12 whoami.localhost
 ```
+
 ---
 
 ## Traefik jwt token
@@ -161,82 +161,65 @@ Si `whoami.localhost` no se resuelve, añade esta entrada al archivo `/etc/hosts
       +---------------------------------------------------------------+
 ```
 
+## Descripción de Nodos Externos Balanceadores
+
+En algunos casos, es posible que desees conectar balanceadores de carga externos al clúster Kubernetes. Estos balanceadores externos no pueden comunicarse directamente con los pods dentro del clúster debido a que están fuera del entorno de red del clúster. Para habilitar esta comunicación, es necesario realizar una configuración especial que permita enrutar el tráfico desde los balanceadores externos hacia los pods.
+
+### Configuración Requerida
+
+1. **Habilitar el Acceso Externo**:
+   - Configura reglas de firewall para permitir el tráfico desde los balanceadores externos hacia los nodos del clúster.
+   - Asegúrate de que los puertos necesarios estén abiertos (por ejemplo, el puerto 6443 para el API Server y los puertos utilizados por los servicios expuestos).
+
+2. **Configurar Servicios con `NodePort` o `LoadBalancer`**:
+   - Utiliza servicios de tipo `NodePort` o `LoadBalancer` para exponer los pods a través de los nodos del clúster.
+   - Por ejemplo, puedes definir un servicio de tipo `NodePort` en el archivo YAML del servicio:
+
+     ```yaml
+     apiVersion: v1
+     kind: Service
+     metadata:
+       name: mi-servicio
+     spec:
+       type: NodePort
+       selector:
+         app: mi-aplicacion
+       ports:
+         - protocol: TCP
+           port: 80
+           targetPort: 8080
+           nodePort: 30001
+     ```
+
+3. **Configurar el Balanceador Externo**:
+   - Configura el balanceador externo para enrutar el tráfico hacia las IPs de los nodos del clúster y los puertos expuestos por los servicios de tipo `NodePort` o `LoadBalancer`.
+   - Asegúrate de que el balanceador externo pueda resolver los nombres DNS de los servicios si estás utilizando un servicio DNS interno.
+
+4. **Verificar la Conectividad**:
+   - Realiza pruebas para asegurarte de que el balanceador externo puede acceder a los servicios expuestos en el clúster.
+   - Puedes usar herramientas como `curl` o `wget` para verificar la conectividad.
+
+### Ejemplo de Configuración
+
+Si tienes un balanceador externo con IP `10.17.6.10` y deseas conectarlo a un servicio expuesto en el clúster, asegúrate de que:
+
+- El servicio en el clúster esté configurado con un `NodePort` accesible, por ejemplo, el puerto `30001`.
+- El balanceador externo esté configurado para enrutar el tráfico hacia las IPs de los nodos del clúster (por ejemplo, `10.17.4.24`, `10.17.4.25`, etc.) en el puerto `30001`.
+
+Con esta configuración, el balanceador externo podrá comunicarse con los pods dentro del clúster a través de los nodos y los servicios expuestos.
+
 ## Contribuciones
 
 ¡Las contribuciones son bienvenidas! Si encuentras algún problema o tienes sugerencias de mejora, abre un issue o envía un pull request.
 
 ## Licencia
 
-## 📜 Licencia este proyecto está licenciado bajo la **Licencia MIT** [LICENSE](LICENSE).
-
-## Autor
-
-Desarrollado por [Victor Gálvez](https://github.com/vhgalvez) como parte de la implementación de entornos Kubernetes altamente escalables y gestionados.
-
-
-> Proyecto independiente para usarse como prerequisito en arquitecturas como [FlatcarMicroCloud](https://github.com/vhgalvez/FlatcarMicroCloud)
-
-
-
-
-
-sudo ansible-vault create group_vars/load_balancers/main.yml
-
- 
-sudo ansible-vault edit group_vars/load_balancers/main.yml
-
-
-
-sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml --ask-vault-pass
-
-
-
-
-sudo chown victory:victory group_vars/load_balancers/main.yml
-chmod 600 group_vars/load_balancers/main.yml
-
-
-
-sudo ansible-vault decrypt group_vars/load_balancers/main.yml
-sudo cat group_vars/load_balancers/main.yml
-sudo ansible-vault encrypt group_vars/load_balancers/main.yml
-
-
-
-
-traefik_dashboard_htpasswd: |
-  admin:$apr1$K7NbnfJf$phKUBJeoyOaEFZx3AH8Mu.
+Este proyecto está licenciado bajo la **Licencia MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
 ---
-traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
 
+[Generador de Hash MD5](https://www.md5hashgenerator.com/)
 
-traefik_dashboard_htpasswd: "admin:e10adc3949ba59abbe56e057f20f883e"
+---
 
-https://www.md5hashgenerator.com/
-
-🟢 En Ubuntu / Debian:
-bash
-Copiar
-Editar
-sudo apt update
-sudo apt install apache2-utils
-🔵 En Rocky / AlmaLinux / CentOS:
-bash
-Copiar
-Editar
-sudo dnf install httpd-tools
-
-sudo apt update
-sudo apt install apache2-utils
-
-htpasswd -nb admin 123456
-
-
-admin:$apr1$EmwxsRBo$wxwfDVIUfvrM.LFk4AWsr1
-
-
-
-~/.kube/config: /home/core/.kube/config
-/etc/rancher/k3s/k3s.yaml
 /var/lib/rancher/k3s/server/tls/client-admin.crt
