@@ -62,6 +62,7 @@ Una vez que los certificados estén listos, puedes instalar y configurar **Traef
 ```bash
 sudo ansible-playbook -i inventory/hosts.ini ansible/playbooks/install_traefik.yml
 ```
+
 ### Resetear el entorno de Traefik
 
 
